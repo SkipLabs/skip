@@ -15,7 +15,7 @@ import type {
   Mapper,
   LazyCompute,
   ExternalService,
-  NamedEagerCollections,
+  SharedCollections,
   Resource,
   Watermark,
   HandlerInfo,
@@ -23,10 +23,10 @@ import type {
   ChangeManager,
 } from "@skipruntime/core";
 import {
-  ServiceInstance,
   ToBinding,
   type JSONLazyCompute,
   type JSONMapper,
+  type ServiceInstance,
 } from "@skipruntime/core";
 
 import type {
@@ -82,7 +82,7 @@ export interface FromWasm {
   // Resource
 
   SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
+    ref: Handle<Resource<SharedCollections>>,
   ): ptr<Internal.Resource>;
 
   // Service
@@ -284,12 +284,12 @@ interface ToWasm {
   // Resource
 
   SkipRuntime_Resource__instantiate(
-    resource: Handle<Resource<NamedEagerCollections>>,
+    resource: Handle<Resource<SharedCollections>>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.String>;
 
   SkipRuntime_deleteResource(
-    resource: Handle<Resource<NamedEagerCollections>>,
+    resource: Handle<Resource<SharedCollections>>,
   ): void;
 
   // ServiceDefinition
@@ -461,7 +461,7 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
+    ref: Handle<Resource<SharedCollections>>,
   ): Pointer<Internal.Resource> {
     return this.fromWasm.SkipRuntime_createResource(ref);
   }
@@ -872,7 +872,7 @@ class LinksImpl implements Links {
   // Resource
 
   instantiateOfResource(
-    skresource: Handle<Resource<NamedEagerCollections>>,
+    skresource: Handle<Resource<SharedCollections>>,
     skcollections: ptr<Internal.CJObject>,
   ): ptr<Internal.String> {
     return this.utils.exportString(
@@ -883,7 +883,7 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteResource(resource: Handle<Resource<NamedEagerCollections>>) {
+  deleteResource(resource: Handle<Resource<SharedCollections>>) {
     this.tobinding.SkipRuntime_deleteResource(resource);
   }
 

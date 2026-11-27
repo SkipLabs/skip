@@ -506,13 +506,43 @@ export type SharedCollections = {
 };
 
 /**
+ * Map a record of `InputDefinition`s to the corresponding record of
+ * `EagerCollection`s passed to `SkipService.createGraph`.
+ */
+export type InputCollections<Defs> = {
+  readonly [K in keyof Defs]: Defs[K] extends InputDefinition<
+    infer Key,
+    infer Val
+  >
+    ? EagerCollection<Key, Val>
+    : never;
+};
+
+/**
+ * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
+ */
+export type AllInputDefs<T> = {
+  readonly [K in keyof T]: AbstractInputDefinition;
+};
+
+/**
+ * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
+ * `AbstractLazyCollection`.
+ */
+export type AllSharedCollections<T> = {
+  readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
+};
+
+/**
  * Resource provided by a `SkipService`.
  *
  * `Resource`s make up the public interface of a `SkipService`, specifying how to respond to reactive requests, either by accessing data from the shared computation graph generated in the service's `createGraph` function or extending it with further reactive computations as needed to handle the request.
  *
  * @typeParam Collections - Collections provided to the resource computation by the service's `createGraph`.
  */
-export interface Resource<Collections extends SharedCollections> {
+export interface Resource<
+  Collections extends AllSharedCollections<Collections>,
+> {
   /**
    * Build the reactive compute graph of the reactive resource.
    *
@@ -527,17 +557,17 @@ export interface Resource<Collections extends SharedCollections> {
 }
 
 /**
- * Constructor type for a `Resource`, enabling sound typing of resource constructor parameters.
+ * Constructor type for a `Resource`.
  *
- * Using `never` for the `Params` position leverages function parameter contravariance:
- * `new (params: SpecificType) => R` is assignable to `new (params: never) => R`.
+ * `Params` defaults to `Json` so resource constructors accept arbitrary JSON
+ * request parameters and validate them at runtime before narrowing.
  *
  * @typeParam Collections - Collections provided to the resource computation.
  * @typeParam Params - Type of the constructor parameter.
  */
 export type ResourceClass<
-  Collections extends SharedCollections,
-  Params extends Json,
+  Collections extends AllSharedCollections<Collections>,
+  Params extends Json = Json,
 > = new (params: Params) => Resource<Collections>;
 
 /**
@@ -596,8 +626,8 @@ export type NamedInputDefinitions = {
  * Skip services operate over data organized into _collections_, each of which has a unique string name and associates _keys_ to one or more _values_.
  * The contents of collections are computed from initial data, other collections, or reactive or non-reactive external resources.
  *
- * A Skip service's `Inputs` are collections that start populated with the initial data of the corresponding `inputs` definitions.
- * The input collections is the mechanism by which a Skip service can accept writes.
+ * A Skip service's input collections are defined by `inputs` (typed by `InputDefs`) and start populated with the initial data of each corresponding `InputDefinition`.
+ * Their collection types are derived via `InputCollections<InputDefs>`, and input collections are the mechanism by which a Skip service can accept writes.
  * See `runService` for the write requests of the HTTP API, and `SkipServiceBroker` for the write operations of the method-call API.
  *
  * It can be useful to think of the structure of a service's computation as a directed acyclic graph, the _reactive computation graph_, where the vertices are the named collections, and the edges are the functions (`Mapper`s and `Reducer`s) that produce collections from other collections.
@@ -631,13 +661,11 @@ export type NamedInputDefinitions = {
  * The resulting eager collection can then be incorporated into the reactive computation graph just like any other.
  *
  * @typeParam InputDefs - Definitions of the service's input collections, including their initial data.
- * @typeParam Inputs - The service's input collections.
  * @typeParam ResourceInputs - Collections provided to the resource computation by the service's `createGraph`.
  */
 export interface SkipService<
-  InputDefs extends NamedInputDefinitions,
-  Inputs extends NamedEagerCollections,
-  ResourceInputs extends SharedCollections,
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
 > {
   /**
    * Input definitions for this service's input collections, including initial data.
@@ -651,17 +679,19 @@ export interface SkipService<
 
   /** Reactive resources which constitute the public interface of this reactive service. */
   readonly resources: {
-    readonly [name: string]: ResourceClass<ResourceInputs, never>;
+    readonly [name: string]: ResourceClass<ResourceInputs, Json>;
   };
 
   /**
    * Build the shared reactive computation graph by defining collections to be passed to resources.
    *
-   * @param inputCollections - The service's input collections.
-   * @param context - Skip Runtime internal state.
-   * @returns Reactive collections accessible to the resources.
+   * Receives `InputCollections<InputDefs>` (key/value types derived from `inputs`) and the Skip Runtime `Context`,
+   * returning the reactive collections accessible to the service's resources.
    */
-  createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
+  readonly createGraph: (
+    inputs: InputCollections<InputDefs>,
+    context: Context,
+  ) => ResourceInputs;
 }
 
 /**
@@ -670,6 +700,5 @@ export interface SkipService<
  */
 export type AnySkipService = SkipService<
   NamedInputDefinitions,
-  NamedEagerCollections,
   SharedCollections
 >;

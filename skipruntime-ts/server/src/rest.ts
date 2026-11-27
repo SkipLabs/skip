@@ -1,12 +1,16 @@
 import express from "express";
 import type { Express } from "express";
 import {
-  ServiceInstance,
   SkipUnknownCollectionError,
   SkipResourceInstanceInUseError,
   SkipRESTError,
 } from "@skipruntime/core";
-import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
+import type {
+  CollectionUpdate,
+  Entry,
+  Json,
+  ServiceInstance,
+} from "@skipruntime/core";
 
 export function registerControlServiceRoutes(
   app: Express,

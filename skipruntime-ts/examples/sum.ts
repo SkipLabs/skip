@@ -41,8 +41,8 @@ class Minus implements Mapper<string, [number, number], string, number> {
 }
 
 type Collections = {
-  input1: EagerCollection<string, number>;
-  input2: EagerCollection<string, number>;
+  readonly input1: EagerCollection<string, number>;
+  readonly input2: EagerCollection<string, number>;
 };
 
 class Add implements Resource<Collections> {
@@ -60,17 +60,21 @@ class Sub implements Resource<Collections> {
   }
 }
 
-const service = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { add: Add, sub: Sub },
-  createGraph: (inputs: Collections) => inputs,
-};
-
-const server = await runService(service, {
-  control_port: 3588,
-  streaming_port: 3587,
-  platform,
-});
+const server = await runService(
+  {
+    inputs: {
+      input1: new InputDefinition<string, number>(),
+      input2: new InputDefinition<string, number>(),
+    },
+    resources: { add: Add, sub: Sub },
+    createGraph: (ic) => ic,
+  },
+  {
+    control_port: 3588,
+    streaming_port: 3587,
+    platform,
+  },
+);
 
 async function shutdown() {
   await server.close();

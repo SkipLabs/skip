@@ -179,7 +179,7 @@ export class SkipServiceBroker {
    *
    * @typeParam K - Type of keys.
    * @typeParam V - Type of values.
-   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param collection - Name of the input collection to update, must be a key of the `inputs` field (`InputDefs`) of the `SkipService` running at `entrypoint`.
    * @param entries - Entries to write.
    * @returns {void}
    */
@@ -197,7 +197,7 @@ export class SkipServiceBroker {
    * Remove all values associated with a key in a collection.
    *
    * @typeParam K - Type of keys.
-   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param collection - Name of the input collection to update, must be a key of the `inputs` field (`InputDefs`) of the `SkipService` running at `entrypoint`.
    * @param key - Key of entry to delete.
    * @returns {void}
    */

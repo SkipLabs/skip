@@ -22,19 +22,24 @@ import { sknative } from "../skiplang-std/index.js";
 
 import type * as Internal from "./internal.js";
 import {
+  type AllInputDefs,
+  type AllSharedCollections,
   type CollectionUpdate,
   type Context,
   type EagerCollection,
   type Entry,
+  type InputCollections,
   type LazyCollection,
   type LazyCompute,
   type Mapper,
   type NamedEagerCollections,
+  type NamedInputDefinitions,
   type Values,
   type DepSafe,
   type Reducer,
   type Resource,
   type AnySkipService,
+  type SkipService,
   type Watermark,
   type ExternalService,
   InputDefinition,
@@ -50,7 +55,12 @@ import {
   SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
 } from "./errors.js";
-import { type Notifier, type Handle, type FromBinding } from "./binding.js";
+import {
+  eraseService,
+  type Notifier,
+  type Handle,
+  type FromBinding,
+} from "./binding.js";
 
 export * from "./api.js";
 export * from "./errors.js";
@@ -121,17 +131,8 @@ export class ServiceDefinition {
     }
   }
 
-  buildResource(
-    name: string,
-    parameters: Json,
-  ): Resource<NamedEagerCollections> {
-    const builder = (
-      this.service.resources as {
-        readonly [name: string]: new (
-          params: Json,
-        ) => Resource<NamedEagerCollections>;
-      }
-    )[name];
+  buildResource(name: string, parameters: Json): Resource<SharedCollections> {
+    const builder = this.service.resources[name];
     if (!builder) throw new Error(`Resource '${name}' not exist.`);
     return new builder(parameters);
   }
@@ -162,7 +163,10 @@ export class ServiceDefinition {
     inputCollections: NamedEagerCollections,
     context: Context,
   ): SharedCollections {
-    return this.service.createGraph(inputCollections, context);
+    return this.service.createGraph(
+      inputCollections as unknown as InputCollections<NamedInputDefinitions>,
+      context,
+    );
   }
 
   subscribe(
@@ -630,12 +634,8 @@ export type SubscriptionID = Opaque<string, "subscription">;
  * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
  * and operations to manage subscriptions and the service itself.
  */
-export class ServiceInstance {
-  constructor(
-    private readonly refs: ToBinding,
-    readonly forkName: Nullable<string>,
-    private definition: ServiceDefinition,
-  ) {}
+export interface ServiceInstance {
+  readonly forkName: Nullable<string>;
 
   /**
    * Instantiate a resource with some parameters and client session authentication token
@@ -644,6 +644,101 @@ export class ServiceInstance {
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
    * @returns The resulting promise
    */
+  instantiateResource(
+    identifier: string,
+    resource: string,
+    params: Json,
+  ): Promise<void>;
+
+  /**
+   * Creates if not exists and get all current values of specified resource
+   * @param resource - the resource name corresponding to a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @returns The current values of the corresponding resource with reactive response token to allow subscription
+   */
+  getAll<K extends Json, V extends Json>(
+    resource: string,
+    params?: Json,
+  ): Promise<Entry<K, V>[]>;
+
+  /**
+   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist
+   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
+   * @param key - A key to look up in the resource instance
+   * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
+   * @returns The current value(s) for this key in the specified resource instance
+   */
+  getArray<K extends Json, V extends Json>(
+    resource: string,
+    key: K,
+    params?: Json,
+  ): Promise<V[]>;
+
+  /**
+   * Close the specified resource instance
+   * @param resourceInstanceId - The resource identifier
+   */
+  closeResourceInstance(resourceInstanceId: string): void;
+
+  /**
+   * Initiate reactive subscription on a resource instance
+   * @param resourceInstanceId - the resource instance identifier
+   * @param notifier - the object containing subscription callbacks
+   * @param notifier.subscribed - A callback to execute when subscription effectively done
+   * @param notifier.notify - A callback to execute on collection updates
+   * @param notifier.close - A callback to execute on resource close
+   * @param watermark - the watermark where to start the subscription
+   * @returns A subscription identifier
+   */
+  subscribe<K extends Json, V extends Json>(
+    resourceInstanceId: string,
+    notifier: {
+      subscribed: () => void;
+      notify: (update: CollectionUpdate<K, V>) => void;
+      close: () => void;
+    },
+    watermark?: string,
+  ): SubscriptionID;
+
+  /**
+   * Terminate a client's subscription to a reactive resource instance
+   * @param id - The subscription identifier returned by a call to `subscribe`
+   */
+  unsubscribe(id: SubscriptionID): void;
+
+  /**
+   * Update an input collection
+   * @param collection - the name of the input collection to update
+   * @param entries - entries to update in the collection.
+   */
+  update<K extends Json, V extends Json>(
+    collection: string,
+    entries: Entry<K, V>[],
+  ): Promise<void>;
+
+  /**
+   * Close all resources and shut down the service.
+   * Any subsequent calls on the service will result in errors.
+   * @returns The promise of externals services shutdowns
+   */
+  close(): Promise<unknown>;
+
+  reload<
+    InputDefs extends AllInputDefs<InputDefs>,
+    ResourceInputs extends AllSharedCollections<ResourceInputs>,
+  >(
+    service: SkipService<InputDefs, ResourceInputs>,
+    changes: ChangeManager,
+  ): Promise<void>;
+}
+
+export class ServiceInstanceImpl implements ServiceInstance {
+  constructor(
+    private readonly refs: ToBinding,
+    readonly forkName: Nullable<string>,
+    private definition: ServiceDefinition,
+  ) {}
+
   instantiateResource(
     identifier: string,
     resource: string,
@@ -659,12 +754,6 @@ export class ServiceInstance {
     );
   }
 
-  /**
-   * Creates if not exists and get all current values of specified resource
-   * @param resource - the resource name corresponding to a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @returns The current values of the corresponding resource with reactive response token to allow subscription
-   */
   async getAll<K extends Json, V extends Json>(
     resource: string,
     params: Json = {},
@@ -692,13 +781,6 @@ export class ServiceInstance {
     }
   }
 
-  /**
-   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist
-   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
-   * @param key - A key to look up in the resource instance
-   * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @returns The current value(s) for this key in the specified resource instance
-   */
   async getArray<K extends Json, V extends Json>(
     resource: string,
     key: K,
@@ -727,10 +809,6 @@ export class ServiceInstance {
     }
   }
 
-  /**
-   * Close the specified resource instance
-   * @param resourceInstanceId - The resource identifier
-   */
   closeResourceInstance(resourceInstanceId: string): void {
     this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
@@ -741,16 +819,6 @@ export class ServiceInstance {
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
-  /**
-   * Initiate reactive subscription on a resource instance
-   * @param resourceInstanceId - the resource instance identifier
-   * @param notifier - the object containing subscription callbacks
-   * @param notifier.subscribed - A callback to execute when subscription effectively done
-   * @param notifier.notify - A callback to execute on collection updates
-   * @param notifier.close - A callback to execute on resource close
-   * @param watermark - the watermark where to start the subscription
-   * @returns A subscription identifier
-   */
   subscribe<K extends Json, V extends Json>(
     resourceInstanceId: string,
     notifier: {
@@ -785,10 +853,6 @@ export class ServiceInstance {
     return resourceInstanceId as SubscriptionID;
   }
 
-  /**
-   * Terminate a client's subscription to a reactive resource instance
-   * @param id - The subscription identifier returned by a call to `subscribe`
-   */
   unsubscribe(id: SubscriptionID): void {
     this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
@@ -799,11 +863,6 @@ export class ServiceInstance {
     }
   }
 
-  /**
-   * Update an input collection
-   * @param collection - the name of the input collection to update
-   * @param entries - entries to update in the collection.
-   */
   async update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
@@ -849,11 +908,6 @@ export class ServiceInstance {
     }
   }
 
-  /**
-   * Close all resources and shut down the service.
-   * Any subsequent calls on the service will result in errors.
-   * @returns The promise of externals services shutdowns
-   */
   close(): Promise<unknown> {
     this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
@@ -867,11 +921,17 @@ export class ServiceInstance {
     }
   }
 
-  async reload(service: AnySkipService, changes: ChangeManager): Promise<void> {
+  async reload<
+    InputDefs extends AllInputDefs<InputDefs>,
+    ResourceInputs extends AllSharedCollections<ResourceInputs>,
+  >(
+    service: SkipService<InputDefs, ResourceInputs>,
+    changes: ChangeManager,
+  ): Promise<void> {
     if (this.forkName) {
       throw new SkipError("Reload cannot be called in transaction.");
     }
-    const definition = this.definition.derive(service);
+    const definition = this.definition.derive(eraseService(service));
     this.refs.setFork(this.forkName);
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
@@ -920,16 +980,11 @@ export class ServiceInstance {
     }
   }
 
-  /**
-   * Fork the service with current specified name.
-   * @param name - the name of the fork.
-   * @returns The forked ServiceInstance
-   */
-  private fork(name: string): ServiceInstance {
+  private fork(name: string): ServiceInstanceImpl {
     if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
     this.refs.setFork(this.forkName);
     this.refs.fork(name);
-    return new ServiceInstance(this.refs, name, this.definition);
+    return new ServiceInstanceImpl(this.refs, name, this.definition);
   }
 
   private merge(ignore: string[]): void {
@@ -1190,7 +1245,7 @@ export class ToBinding {
   }
 
   SkipRuntime_deleteResource(
-    resource: Handle<Resource<NamedEagerCollections>>,
+    resource: Handle<Resource<SharedCollections>>,
   ): void {
     this.handles.deleteHandle(resource);
   }
@@ -1455,7 +1510,7 @@ export class ToBinding {
       });
       this.setFork(uuid);
       this.merge();
-      return new ServiceInstance(this, null, definition);
+      return new ServiceInstanceImpl(this, null, definition);
     } catch (ex: unknown) {
       this.setFork(uuid);
       try {

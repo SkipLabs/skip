@@ -19,14 +19,14 @@ type Group = { name: string; members: UserID[] };
 
 // Type alias for inputs to our service
 type ServiceInputs = {
-  users: EagerCollection<UserID, User>;
-  groups: EagerCollection<GroupID, Group>;
+  readonly users: EagerCollection<UserID, User>;
+  readonly groups: EagerCollection<GroupID, Group>;
 };
 
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
-  users: EagerCollection<UserID, User>;
-  activeMembers: EagerCollection<GroupID, UserID>;
+  readonly users: EagerCollection<UserID, User>;
+  readonly activeMembers: EagerCollection<GroupID, UserID>;
 };
 
 // Mapper function to compute the active users of each group
@@ -107,7 +107,7 @@ const inputs = {
 const service = {
   inputs,
   resources: { active_friends: ActiveFriends },
-  createGraph(input: ServiceInputs): ResourceInputs {
+  createGraph: (input: ServiceInputs): ResourceInputs => {
     const users = input.users;
     const activeMembers = input.groups.map(ActiveMembers, users);
     const _groupsPerUser = input.groups.map(GroupsPerUser);

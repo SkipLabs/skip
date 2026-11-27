@@ -2,26 +2,49 @@ import type { Pointer, Nullable, Json } from "../skiplang-json/index.js";
 import type * as Internal from "./internal.js";
 
 import {
+  type AllInputDefs,
+  type AllSharedCollections,
+  type AnySkipService,
   type CollectionUpdate,
   type ExternalService,
   type LazyCompute,
   type Mapper,
-  type NamedEagerCollections,
   type Reducer,
   type Resource,
+  type SharedCollections,
+  type SkipService,
 } from "./api.js";
 import type { HandlerInfo, ServiceDefinition } from "./index.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
+/**
+ * Erase a typed `SkipService`'s type parameters at the runtime FFI boundary.
+ *
+ * `SkipService` is invariant in both `InputDefs` and `ResourceInputs` (`InputDefs`
+ * appears covariantly in `inputs` and contravariantly in `createGraph`;
+ * `ResourceInputs` appears covariantly in `createGraph` and contravariantly in
+ * `resources`), so concrete services are not structurally assignable to
+ * `AnySkipService`. The runtime preserves these invariants dynamically by
+ * constructing input collections for `service.inputs` and passing the output of
+ * `service.createGraph` to `service.resources`.
+ *
+ * @param service - The typed `SkipService` to erase.
+ * @returns The type-erased `AnySkipService`.
+ */
+export function eraseService<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(service: SkipService<InputDefs, ResourceInputs>): AnySkipService {
+  return service as unknown as AnySkipService;
+}
+
 export class ResourceBuilder {
   constructor(
-    private readonly builder: new (
-      params: Json,
-    ) => Resource<NamedEagerCollections>,
+    private readonly builder: new (params: Json) => Resource<SharedCollections>,
   ) {}
 
-  build(parameters: Json): Resource<NamedEagerCollections> {
+  build(parameters: Json): Resource<SharedCollections> {
     const builder = this.builder;
     return new builder(parameters);
   }
@@ -76,7 +99,7 @@ export interface FromBinding {
   // Resource
 
   SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
+    ref: Handle<Resource<SharedCollections>>,
   ): Pointer<Internal.Resource>;
 
   // Service

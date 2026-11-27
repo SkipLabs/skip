@@ -1,6 +1,15 @@
 import type { Exception as IException } from "@skipruntime/core/internal.js";
-import { ServiceInstance, ToBinding } from "@skipruntime/core";
-import type { FromBinding as SkipRuntimeFromBinding } from "@skipruntime/core/binding.js";
+import {
+  ToBinding,
+  type AllInputDefs,
+  type AllSharedCollections,
+  type ServiceInstance,
+  type SkipService,
+} from "@skipruntime/core";
+import {
+  eraseService,
+  type FromBinding as SkipRuntimeFromBinding,
+} from "@skipruntime/core/binding.js";
 import {
   buildJsonConverter,
   type Binding as JsonBinding,
@@ -19,8 +28,6 @@ type AddOn = {
 
 const skip_runtime: AddOn = require("../build/Release/skip_runtime.node");
 
-import type { AnySkipService } from "@skipruntime/core";
-
 const jsonBinding: JsonBinding = skip_runtime.getJsonBinding();
 const jsonConverter = buildJsonConverter(jsonBinding);
 const fromBinding = skip_runtime.getSkipRuntimeFromBinding();
@@ -31,10 +38,13 @@ const tobinding = new ToBinding(
   skip_runtime.getErrorObject,
 );
 
-export function initService(service: AnySkipService): Promise<ServiceInstance> {
+export function initService<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(service: SkipService<InputDefs, ResourceInputs>): Promise<ServiceInstance> {
   skip_runtime.initSkipRuntimeToBinding(tobinding);
   try {
-    return Promise.resolve(tobinding.initService(service));
+    return Promise.resolve(tobinding.initService(eraseService(service)));
   } catch (e: unknown) {
     return Promise.reject<ServiceInstance>(e as Error);
   }

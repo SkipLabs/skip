@@ -76,8 +76,8 @@ class CallCompute
   }
 }
 
-type Inputs = { cells: EagerCollection<string, number | string> };
-type Outputs = { output: EagerCollection<string, number | string> };
+type Inputs = { readonly cells: EagerCollection<string, number | string> };
+type Outputs = { readonly output: EagerCollection<string, number | string> };
 
 class ComputedCells implements Resource<Outputs> {
   instantiate(collections: Outputs): EagerCollection<string, number | string> {
@@ -85,9 +85,9 @@ class ComputedCells implements Resource<Outputs> {
   }
 }
 const service = {
-  inputs: { cells: new InputDefinition() },
+  inputs: { cells: new InputDefinition<string, number | string>() },
   resources: { computed: ComputedCells },
-  createGraph(inputCollections: Inputs, context: Context): Outputs {
+  createGraph: (inputCollections: Inputs, context: Context): Outputs => {
     const cells = inputCollections.cells;
     // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
     const evaluator = context.createLazyCollection(ComputeExpression, cells);

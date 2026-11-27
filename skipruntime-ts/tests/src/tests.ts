@@ -1,5 +1,7 @@
 import { expect, isEqual } from "earl";
 import type {
+  AllInputDefs,
+  AllSharedCollections,
   Context,
   Json,
   Mapper,
@@ -9,6 +11,7 @@ import type {
   LazyCollection,
   Values,
   AnySkipService,
+  SkipService,
   Resource,
   Entry,
   ExternalService,
@@ -173,7 +176,7 @@ class Map1 implements Mapper<string, number, string, number> {
   }
 }
 
-type Input_SN = { input: EagerCollection<string, number> };
+type Input_SN = { readonly input: EagerCollection<string, number> };
 
 class Map1Resource implements Resource<Input_SN> {
   instantiate(collections: Input_SN): EagerCollection<string, number> {
@@ -181,13 +184,10 @@ class Map1Resource implements Resource<Input_SN> {
   }
 }
 
-const map1Service: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const map1Service = {
+  inputs: { input: new InputDefinition<string, number>() },
   resources: { map1: Map1Resource },
-
-  createGraph(inputCollections: Input_SN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_SN) => ic,
 };
 
 //// testMap2
@@ -208,8 +208,8 @@ class Map2 implements Mapper<string, number, string, number> {
 }
 
 type Input_SN_SN = {
-  input1: EagerCollection<string, number>;
-  input2: EagerCollection<string, number>;
+  readonly input1: EagerCollection<string, number>;
+  readonly input2: EagerCollection<string, number>;
 };
 
 class Map2Resource implements Resource<Input_SN_SN> {
@@ -218,13 +218,13 @@ class Map2Resource implements Resource<Input_SN_SN> {
   }
 }
 
-const map2Service: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { map2: Map2Resource },
-
-  createGraph(inputCollections: Input_SN_SN) {
-    return inputCollections;
+const map2Service = {
+  inputs: {
+    input1: new InputDefinition<string, number>(),
+    input2: new InputDefinition<string, number>(),
   },
+  resources: { map2: Map2Resource },
+  createGraph: (ic: Input_SN_SN) => ic,
 };
 
 //// testMap3
@@ -241,13 +241,13 @@ class Map3Resource implements Resource<Input_SN_SN> {
   }
 }
 
-const map3Service: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { map3: Map3Resource },
-
-  createGraph(inputCollections: Input_SN_SN) {
-    return inputCollections;
+const map3Service = {
+  inputs: {
+    input1: new InputDefinition<string, number>(),
+    input2: new InputDefinition<string, number>(),
   },
+  resources: { map3: Map3Resource },
+  createGraph: (ic: Input_SN_SN) => ic,
 };
 
 //// test a one-to-one Mapper
@@ -264,7 +264,7 @@ class AddKeyAndValue implements Mapper<number, number, number, number> {
   }
 }
 
-type Input_NN = { input: EagerCollection<number, number> };
+type Input_NN = { readonly input: EagerCollection<number, number> };
 
 class OneToOneMapperResource implements Resource<Input_NN> {
   instantiate(cs: Input_NN): EagerCollection<number, number> {
@@ -272,13 +272,10 @@ class OneToOneMapperResource implements Resource<Input_NN> {
   }
 }
 
-const oneToOneMapperService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const oneToOneMapperService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { valueMapper: OneToOneMapperResource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testSize
@@ -292,8 +289,8 @@ class SizeMapper implements Mapper<number, number, number, number> {
 }
 
 type Input_NN_NN = {
-  input1: EagerCollection<number, number>;
-  input2: EagerCollection<number, number>;
+  readonly input1: EagerCollection<number, number>;
+  readonly input2: EagerCollection<number, number>;
 };
 
 class SizeResource implements Resource<Input_NN_NN> {
@@ -302,13 +299,13 @@ class SizeResource implements Resource<Input_NN_NN> {
   }
 }
 
-const sizeService: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { size: SizeResource },
-
-  createGraph(inputCollections: Input_NN_NN) {
-    return inputCollections;
+const sizeService = {
+  inputs: {
+    input1: new InputDefinition<number, number>(),
+    input2: new InputDefinition<number, number>(),
   },
+  resources: { size: SizeResource },
+  createGraph: (ic: Input_NN_NN) => ic,
 };
 
 //// testSlicedMap1
@@ -324,13 +321,10 @@ class SlicedMap1Resource implements Resource<Input_NN> {
   }
 }
 
-const slicedMap1Service: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const slicedMap1Service = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { slice: SlicedMap1Resource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testLazy
@@ -361,20 +355,17 @@ class LazyResource implements Resource<Input_NN> {
   }
 }
 
-const lazyService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const lazyService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { lazy: LazyResource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testSharedLazy
 
 type Lazy_NN = {
-  input: EagerCollection<number, number>;
-  lazy: LazyCollection<number, number>;
+  readonly input: EagerCollection<number, number>;
+  readonly lazy: LazyCollection<number, number>;
 };
 
 class SharedLazyResource implements Resource<Lazy_NN> {
@@ -383,11 +374,10 @@ class SharedLazyResource implements Resource<Lazy_NN> {
   }
 }
 
-const sharedLazyService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const sharedLazyService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { lazy: SharedLazyResource },
-
-  createGraph(inputCollections: Input_NN, context: Context) {
+  createGraph: (inputCollections: Input_NN, context: Context): Lazy_NN => {
     const lazy = context.createLazyCollection(
       TestLazyAdd,
       inputCollections.input,
@@ -413,13 +403,10 @@ class MapReduceResource implements Resource<Input_NN> {
   }
 }
 
-const mapReduceService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const mapReduceService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { mapReduce: MapReduceResource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testUserMapReduce
@@ -441,13 +428,10 @@ class UserMapReduceResource implements Resource<Input_NN> {
   }
 }
 
-const userMapReduceService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const userMapReduceService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { userMapReduce: UserMapReduceResource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testCount
@@ -458,13 +442,10 @@ class CountResource implements Resource<Input_NN> {
   }
 }
 
-const countService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const countService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { count: CountResource },
-
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 //// testMerge1
@@ -475,13 +456,13 @@ class Merge1Resource implements Resource<Input_NN_NN> {
   }
 }
 
-const merge1Service: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { merge1: Merge1Resource },
-
-  createGraph(inputCollections: Input_NN_NN) {
-    return inputCollections;
+const merge1Service = {
+  inputs: {
+    input1: new InputDefinition<number, number>(),
+    input2: new InputDefinition<number, number>(),
   },
+  resources: { merge1: Merge1Resource },
+  createGraph: (ic: Input_NN_NN) => ic,
 };
 
 function sorted(entries: Entry<Json, Json>[]): Entry<Json, Json>[] {
@@ -513,16 +494,16 @@ class MergeReduceResource implements Resource<Input_NN_NN> {
   }
 }
 
-const mergeReduceService: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
+const mergeReduceService = {
+  inputs: {
+    input1: new InputDefinition<number, number>(),
+    input2: new InputDefinition<number, number>(),
+  },
   resources: {
     mergeMapReduce: MergeMapReduceResource,
     mergeReduce: MergeReduceResource,
   },
-
-  createGraph(inputCollections: Input_NN_NN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_NN_NN) => ic,
 };
 
 // testJSONParams
@@ -545,12 +526,10 @@ class JsonParamsResource implements Resource<Input_NN> {
     return cs.input.map(OffsetMapper, this.offset);
   }
 }
-const jsonParamsService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const jsonParamsService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { jsonParams: JsonParamsResource },
-  createGraph(inputs: Input_NN) {
-    return inputs;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 // testJSONExtract
@@ -571,7 +550,10 @@ class JSONExtract
 }
 
 type Input_NJP = {
-  input: EagerCollection<number, { value: JsonObject; pattern: string }>;
+  readonly input: EagerCollection<
+    number,
+    { value: JsonObject; pattern: string }
+  >;
 };
 
 class JSONExtractResource implements Resource<Input_NJP> {
@@ -580,18 +562,20 @@ class JSONExtractResource implements Resource<Input_NJP> {
   }
 }
 
-const jsonExtractService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
-  resources: { jsonExtract: JSONExtractResource },
-
-  createGraph(inputCollections: Input_NJP) {
-    return inputCollections;
+const jsonExtractService = {
+  inputs: {
+    input: new InputDefinition<
+      number,
+      { value: JsonObject; pattern: string }
+    >(),
   },
+  resources: { jsonExtract: JSONExtractResource },
+  createGraph: (ic: Input_NJP) => ic,
 };
 
 // testBooleanRoundtrip - verifies boolean keys/values are not converted to numbers
 
-type Input_BS = { input: EagerCollection<boolean, string> };
+type Input_BS = { readonly input: EagerCollection<boolean, string> };
 
 class BooleanKeyResource implements Resource<Input_BS> {
   instantiate(cs: Input_BS): EagerCollection<boolean, string> {
@@ -599,13 +583,10 @@ class BooleanKeyResource implements Resource<Input_BS> {
   }
 }
 
-const booleanRoundtripService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const booleanRoundtripService = {
+  inputs: { input: new InputDefinition<boolean, string>() },
   resources: { booleanKey: BooleanKeyResource },
-
-  createGraph(inputCollections: Input_BS) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_BS) => ic,
 };
 
 // testBooleanValueInObjectRoundtrip (#1540) - a boolean computed inside a
@@ -630,8 +611,8 @@ class BoolSpreadMapper implements Mapper<string, BoolObj, string, BoolObj> {
   }
 }
 
-type Input_BN = { input: EagerCollection<string, number> };
-type Input_BO = { input: EagerCollection<string, BoolObj> };
+type Input_BN = { readonly input: EagerCollection<string, number> };
+type Input_BO = { readonly input: EagerCollection<string, BoolObj> };
 
 class BoolObjResource implements Resource<Input_BN> {
   instantiate(cs: Input_BN): EagerCollection<string, BoolObj> {
@@ -645,22 +626,16 @@ class BoolSpreadResource implements Resource<Input_BO> {
   }
 }
 
-const boolObjService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const boolObjService = {
+  inputs: { input: new InputDefinition<string, number>() },
   resources: { boolObj: BoolObjResource },
-
-  createGraph(inputCollections: Input_BN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_BN) => ic,
 };
 
-const boolSpreadService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const boolSpreadService = {
+  inputs: { input: new InputDefinition<string, BoolObj>() },
   resources: { boolSpread: BoolSpreadResource },
-
-  createGraph(inputCollections: Input_BO) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_BO) => ic,
 };
 
 //// testExternalService
@@ -743,15 +718,15 @@ class MockExternalResource implements Resource<Input_NN_NN> {
 }
 
 // As the MockExternal as state: force to renew on each test
-function testExternalService(): AnySkipService {
+function testExternalService() {
   return {
-    inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
+    inputs: {
+      input1: new InputDefinition<number, number>(),
+      input2: new InputDefinition<number, number>(),
+    },
     resources: { external: MockExternalResource },
     externalServices: { external: new MockExternal() },
-
-    createGraph(inputCollections: Input_NN_NN) {
-      return inputCollections;
-    },
+    createGraph: (ic: Input_NN_NN) => ic,
   };
 }
 
@@ -772,18 +747,16 @@ class MapWithNamedExceptionResource implements Resource<Input_SN> {
     return collections.input.map(MapWithNamedException);
   }
 }
-const mapWithNamedExceptionService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const mapWithNamedExceptionService = {
+  inputs: { input: new InputDefinition<string, number>() },
   resources: { mapWithNamedException: MapWithNamedExceptionResource },
-  createGraph(inputCollections: Input_SN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_SN) => ic,
 };
 
 //// initServiceWithExternalService
 
 type Col_N_NA = {
-  c: EagerCollection<number, number[]>;
+  readonly c: EagerCollection<number, number[]>;
 };
 
 class CResource implements Resource<Col_N_NA> {
@@ -792,12 +765,11 @@ class CResource implements Resource<Col_N_NA> {
   }
 }
 
-const initServiceWithExternalService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const initServiceWithExternalService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { display: CResource },
   externalServices: { external: new MockExternal() },
-
-  createGraph(is: Input_NN, context: Context) {
+  createGraph: (is: Input_NN, context: Context): Col_N_NA => {
     const external = context.useExternalResource<number, number>({
       service: "external",
       identifier: "mock",
@@ -811,7 +783,7 @@ const initServiceWithExternalService: AnySkipService = {
 
 //// testMultipleResources
 
-type Input1_SN = { input1: EagerCollection<string, number> };
+type Input1_SN = { readonly input1: EagerCollection<string, number> };
 
 class Resource1 implements Resource<Input1_SN> {
   instantiate(collections: Input1_SN): EagerCollection<string, number> {
@@ -819,7 +791,7 @@ class Resource1 implements Resource<Input1_SN> {
   }
 }
 
-type Input2_SN = { input2: EagerCollection<string, number> };
+type Input2_SN = { readonly input2: EagerCollection<string, number> };
 
 class Resource2 implements Resource<Input2_SN> {
   instantiate(collections: Input2_SN): EagerCollection<string, number> {
@@ -827,13 +799,19 @@ class Resource2 implements Resource<Input2_SN> {
   }
 }
 
-const multipleResourcesService: AnySkipService = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
-  resources: { resource1: Resource1, resource2: Resource2 },
-
-  createGraph(inputCollections: Input_SN_SN) {
-    return inputCollections;
+const multipleResourcesService: SkipService<
+  {
+    readonly input1: InputDefinition<string, number>;
+    readonly input2: InputDefinition<string, number>;
   },
+  Input_SN_SN
+> = {
+  inputs: {
+    input1: new InputDefinition<string, number>(),
+    input2: new InputDefinition<string, number>(),
+  },
+  resources: { resource1: Resource1, resource2: Resource2 },
+  createGraph: (ic) => ic,
 };
 
 //// testPostgres
@@ -1005,11 +983,11 @@ const kafka_config = {
   retry: { multiplier: 1.5 },
   logLevel: kafkaLogLevel.NOTHING,
 };
-function kafkaService(): AnySkipService {
+function kafkaService() {
   const kafka = new KafkaExternalService(kafka_config);
   return {
     inputs: {
-      input: new InputDefinition([
+      input: new InputDefinition<number, number>([
         [1, [10]],
         [2, [20]],
         [3, [30]],
@@ -1019,18 +997,14 @@ function kafkaService(): AnySkipService {
     },
     resources: { resource: KafkaResource },
     externalServices: { kafka },
-    createGraph(inputs: Input_NN) {
-      return inputs;
-    },
+    createGraph: (ic: Input_NN) => ic,
   };
 }
 
 // Wrap service instantiation in a function so that the WASM and Native tests get ahold
 // of separate DB clients and manage their lifecycle properly; normally you'd just
 // construct a service object like the other tests in this file.
-const postgresService: (
-  inresource: boolean,
-) => Promise<AnySkipService> = async (inresource) => {
+const postgresService = async (inresource: boolean) => {
   const postgres = new PostgresExternalService(pg_config);
   await withAlternateConsoleError(
     () => {},
@@ -1046,7 +1020,7 @@ const postgresService: (
 
   return {
     inputs: {
-      input: new InputDefinition([
+      input: new InputDefinition<number, number>([
         [1, [10]],
         [2, [20]],
         [3, [30]],
@@ -1058,7 +1032,7 @@ const postgresService: (
       streamingResource: StreamingPostgresResource,
     },
     externalServices: { postgres },
-    createGraph(inputs: Input_NN, context) {
+    createGraph: (inputs: Input_NN, context: Context): Input_NN => {
       if (inresource) return inputs;
       const pg_data: EagerCollection<number, number> = context
         .useExternalResource<number, PostgresRow>({
@@ -1107,15 +1081,12 @@ class LazyWithUseExternalServiceResource implements Resource<Input_NN> {
   }
 }
 
-function lazyWithUseExternalServiceService(): AnySkipService {
+function lazyWithUseExternalServiceService() {
   return {
-    inputs: { input: new InputDefinition() },
+    inputs: { input: new InputDefinition<number, number>() },
     resources: { lazy: LazyWithUseExternalServiceResource },
     externalServices: { external: new MockExternal() },
-
-    createGraph(inputCollections: Input_NN) {
-      return inputCollections;
-    },
+    createGraph: (ic: Input_NN) => ic,
   };
 }
 
@@ -1133,13 +1104,10 @@ class MapWithExceptionResource implements Resource<Input_SN> {
   }
 }
 
-const mapWithExceptionService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const mapWithExceptionService = {
+  inputs: { input: new InputDefinition<string, number>() },
   resources: { mapWithException: MapWithExceptionResource },
-
-  createGraph(inputCollections: Input_SN) {
-    return inputCollections;
-  },
+  createGraph: (ic: Input_SN) => ic,
 };
 
 //// testMapWithExceptionOnExternal
@@ -1167,15 +1135,12 @@ class MapWithExceptionOnExternalResource implements Resource<Input_SN> {
   }
 }
 
-function mapWithExceptionOnExternalService(): AnySkipService {
+function mapWithExceptionOnExternalService() {
   return {
-    inputs: { input: new InputDefinition() },
+    inputs: { input: new InputDefinition<string, number>() },
     resources: { mapWithException: MapWithExceptionOnExternalResource },
     externalServices: { external: new MockExternal() },
-
-    createGraph(inputCollections: Input_SN) {
-      return inputCollections;
-    },
+    createGraph: (ic: Input_SN) => ic,
   };
 }
 
@@ -1187,13 +1152,12 @@ class NNResource implements Resource<Input_NN> {
   }
 }
 
-function initServiceWithExternalServiceFailure(): AnySkipService {
+function initServiceWithExternalServiceFailure() {
   return {
     inputs: {},
     resources: { display: NNResource },
     externalServices: { external: new MockExternal() },
-
-    createGraph(_is: NamedEagerCollections, context: Context) {
+    createGraph: (_is: NamedEagerCollections, context: Context): Input_NN => {
       const external = context
         .useExternalResource<number, number>({
           service: "external",
@@ -1208,13 +1172,12 @@ function initServiceWithExternalServiceFailure(): AnySkipService {
   };
 }
 
-function initServiceWithFaillingExternalService(): AnySkipService {
+function initServiceWithFaillingExternalService() {
   return {
     inputs: {},
     resources: { display: NNResource },
     externalServices: { external: new MockExternal() },
-
-    createGraph(_is: NamedEagerCollections, context: Context) {
+    createGraph: (_is: NamedEagerCollections, context: Context): Input_NN => {
       const external = context
         .useExternalResource<number, number>({
           service: "external",
@@ -1231,13 +1194,10 @@ function initServiceWithFaillingExternalService(): AnySkipService {
 
 // testResourceNotifications
 
-const resourceNotificationsService: AnySkipService = {
-  inputs: { input: new InputDefinition() },
+const resourceNotificationsService = {
+  inputs: { input: new InputDefinition<number, number>() },
   resources: { resource: NNResource },
-
-  createGraph(is: Input_NN) {
-    return is;
-  },
+  createGraph: (ic: Input_NN) => ic,
 };
 
 // testResourceRecomputeNotifications
@@ -1266,16 +1226,13 @@ class ValuesResource implements Resource<Input_NN_NN> {
   }
 }
 
-const resourceRecomputeNotificationsService: AnySkipService = {
+const resourceRecomputeNotificationsService = {
   inputs: {
-    input1: new InputDefinition([[1, [1, 2]]]),
-    input2: new InputDefinition([[1, [1]]]),
+    input1: new InputDefinition<number, number>([[1, [1, 2]]]),
+    input2: new InputDefinition<number, number>([[1, [1]]]),
   },
   resources: { resource: ValuesResource },
-
-  createGraph(is: Input_NN_NN) {
-    return is;
-  },
+  createGraph: (ic: Input_NN_NN) => ic,
 };
 
 class NoChanges implements ChangeManager {
@@ -1345,7 +1302,12 @@ class WithChanges implements ChangeManager {
 
 export function initTests(
   category: string,
-  initService: (service: AnySkipService) => Promise<ServiceInstance>,
+  initService: <
+    InputDefs extends AllInputDefs<InputDefs>,
+    ResourceInputs extends AllSharedCollections<ResourceInputs>,
+  >(
+    service: SkipService<InputDefs, ResourceInputs>,
+  ) => Promise<ServiceInstance>,
 ) {
   const it = (title: string, fn?: AsyncFunc) =>
     mit(`${title}[${category}]`, fn);
@@ -1396,11 +1358,11 @@ export function initTests(
     const forged = {
       __sk_collectionBrand: undefined,
     } as unknown as EagerCollection<Json, Json>;
-    const forgingService: AnySkipService = {
-      inputs: { input: new InputDefinition() },
+    const forgingService = {
+      inputs: { input: new InputDefinition<Json, Json>() },
       resources: {},
       createGraph: (inputCollections: {
-        input: EagerCollection<Json, Json>;
+        readonly input: EagerCollection<Json, Json>;
       }) => ({
         output: inputCollections.input.merge(forged),
       }),
@@ -1966,9 +1928,7 @@ export function initTests(
 
   it("testExternal", async () => {
     const serviceDef = testExternalService();
-    const mockExternal = serviceDef.externalServices![
-      "external"
-    ] as MockExternal;
+    const mockExternal = serviceDef.externalServices.external;
     const resource = "external";
     const service = await initService(serviceDef);
     try {
@@ -2502,9 +2462,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
   });
   it("testReload2", async () => {
     const serviceDef = testExternalService();
-    const mockExternal = serviceDef.externalServices![
-      "external"
-    ] as MockExternal;
+    const mockExternal = serviceDef.externalServices.external;
     const resource = "external";
     const service = await initService(serviceDef);
     try {

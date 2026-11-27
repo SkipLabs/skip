@@ -3,12 +3,11 @@ import {
   InputDefinition,
   LoadStatus,
   ServiceDefinition,
-  ServiceInstance,
+  ServiceInstanceImpl,
   ToBinding,
   type AnySkipService,
   type ChangeManager,
   type ExternalService,
-  type NamedEagerCollections,
 } from "@skipruntime/core";
 import type { FromBinding, Handle } from "@skipruntime/core/binding.js";
 import type { Json, JsonConverter, Pointer } from "@skipruntime/core/json.js";
@@ -62,9 +61,7 @@ function makeService(externalServices?: {
     inputs: { input: new InputDefinition() },
     resources: {},
     externalServices,
-    createGraph(inputCollections: NamedEagerCollections) {
-      return inputCollections;
-    },
+    createGraph: (ic) => ic,
   };
 }
 
@@ -208,7 +205,7 @@ describe("ToBinding", () => {
       });
 
       const def = new ServiceDefinition(makeService());
-      const instance = new ServiceInstance(toBinding, null, def);
+      const instance = new ServiceInstanceImpl(toBinding, null, def);
 
       await expect(instance.update("input", [])).toBeRejectedWith(
         "original update failure",
@@ -234,7 +231,7 @@ describe("ToBinding", () => {
 
       const service = makeService();
       const def = new ServiceDefinition(service);
-      const instance = new ServiceInstance(toBinding, null, def);
+      const instance = new ServiceInstanceImpl(toBinding, null, def);
       const changes: ChangeManager = {
         needInputReload: () => false,
         needResourceReload: () => LoadStatus.Same,

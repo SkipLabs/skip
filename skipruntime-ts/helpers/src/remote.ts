@@ -3,15 +3,16 @@
 import { EventSource } from "eventsource";
 
 import {
-  type AnySkipService,
+  type AllInputDefs,
+  type AllSharedCollections,
   type AbstractEagerCollection,
   type AbstractLazyCollection,
   type Entry,
   type ExternalService,
   type Json,
-  type NamedEagerCollections,
   type Resource,
   type SharedCollections,
+  type SkipService,
   type Context,
   EagerCollectionImpl,
 } from "@skipruntime/core";
@@ -147,11 +148,21 @@ class LeaderResource implements Resource<SharedCollections> {
  *
  * @returns The *leader* component to run `service` in such a configuration.
  */
-export function asLeader(service: AnySkipService): AnySkipService {
+export function asLeader<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(
+  service: SkipService<InputDefs, ResourceInputs>,
+): SkipService<InputDefs, SharedCollections> {
   //TODO: add mechanism to split externals between leader/follower
   return {
-    ...service,
+    inputs: service.inputs,
+    ...(service.externalServices !== undefined
+      ? { externalServices: service.externalServices }
+      : {}),
     resources: { leader: LeaderResource },
+    createGraph: (inputs, ctx) =>
+      service.createGraph(inputs, ctx) as unknown as SharedCollections,
   };
 }
 
@@ -162,29 +173,35 @@ export function asLeader(service: AnySkipService): AnySkipService {
  *
  * The two kinds of shared collection are obtained differently. Eager collections, named in `collections`, are *mirrored* from the leader: the leader maintains them and streams their updates to the follower. Lazy collections cannot be mirrored, since they hold no maintained state to stream; each is instead *rebuilt locally* by the follower, `lazies` mapping its shared name to a function which, given the follower's `Context`, produces the corresponding lazy collection. Together, the two are expected to cover the `ResourceInputs` of `service`.
  *
+ * @remarks
+ * The follower trusts that the leader serves mirrored collections matching the key/value types expected by `service`'s `ResourceInputs`, and that `collections` and `lazies` together cover all keys of `ResourceInputs`.
+ *
  * @returns The *follower* component to run `service` in such a configuration.
  */
-export function asFollower(
-  service: AnySkipService,
+export function asFollower<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(
+  service: SkipService<InputDefs, ResourceInputs>,
   leader: {
     leader: { host: string; streaming_port: number; control_port: number };
-    collections: string[];
-    lazies?: {
-      [name: string]: (context: Context) => AbstractLazyCollection;
-    };
+    collections: readonly (keyof ResourceInputs & string)[];
+    lazies?: Partial<
+      Record<
+        keyof ResourceInputs & string,
+        (context: Context) => AbstractLazyCollection
+      >
+    >;
   },
-): AnySkipService {
+): SkipService<Record<string, never>, ResourceInputs> {
   return {
-    ...service,
     inputs: {},
     externalServices: {
       ...service.externalServices,
       __skip_leader: SkipExternalService.direct(leader.leader),
     },
-    createGraph(
-      _inputs: NamedEagerCollections,
-      context: Context,
-    ): SharedCollections {
+    resources: service.resources,
+    createGraph: (_inputs, context: Context): ResourceInputs => {
       const mirroredCollections: {
         [name: string]: AbstractEagerCollection | AbstractLazyCollection;
       } = {};
@@ -196,13 +213,17 @@ export function asFollower(
         });
       }
       if (leader.lazies) {
-        for (const [collection, lCollectionGetter] of Object.entries(
-          leader.lazies,
-        )) {
-          mirroredCollections[collection] = lCollectionGetter(context);
+        for (const [collection, lCollectionGetter] of Object.entries<
+          ((context: Context) => AbstractLazyCollection) | undefined
+        >(leader.lazies)) {
+          if (lCollectionGetter) {
+            mirroredCollections[collection] = lCollectionGetter(context);
+          }
         }
       }
-      return mirroredCollections;
+      // The follower trusts the leader's runtime collection types (and that
+      // `collections` + `lazies` cover all keys of `ResourceInputs`).
+      return mirroredCollections as unknown as ResourceInputs;
     },
   };
 }

@@ -3,7 +3,6 @@ import type {
   EagerCollection,
   Json,
   Resource,
-  AnySkipService,
 } from "@skipruntime/core";
 import { InputDefinition } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
@@ -27,7 +26,9 @@ type Result = {
   results: Departure[];
 };
 
-type ResourceInputs = { config: EagerCollection<string, (string | number)[]> };
+type ResourceInputs = {
+  readonly config: EagerCollection<string, (string | number)[]>;
+};
 
 class DeparturesResource implements Resource<ResourceInputs> {
   instantiate(
@@ -52,30 +53,31 @@ class DeparturesResource implements Resource<ResourceInputs> {
   }
 }
 
-const service: AnySkipService = {
-  inputs: { config: new InputDefinition() },
-  resources: {
-    departures: DeparturesResource,
+const server = await runService(
+  {
+    inputs: { config: new InputDefinition<string, (string | number)[]>() },
+    resources: {
+      departures: DeparturesResource,
+    },
+    externalServices: {
+      polled: new PolledExternalService({
+        unhcrDeparturesAPI: {
+          url: "https://api.unhcr.org/rsq/v1/departures",
+          interval: 10000,
+          conv: (data: Json) =>
+            (data as Result).results.map((v, idx) => [idx, [v]]),
+          options: { timeout: 1500 },
+        },
+      }),
+    },
+    createGraph: (ic) => ic,
   },
-  externalServices: {
-    polled: new PolledExternalService({
-      unhcrDeparturesAPI: {
-        url: "https://api.unhcr.org/rsq/v1/departures",
-        interval: 10000,
-        conv: (data: Json) =>
-          (data as Result).results.map((v, idx) => [idx, [v]]),
-        options: { timeout: 1500 },
-      },
-    }),
+  {
+    control_port: 3591,
+    streaming_port: 3590,
+    platform,
   },
-  createGraph: (ic) => ic,
-};
-
-const server = await runService(service, {
-  control_port: 3591,
-  streaming_port: 3590,
-  platform,
-});
+);
 
 async function shutdown() {
   await server.close();
