@@ -86,6 +86,6 @@ const follower = asFollower(service, {
 await runService(follower);
 ```
 
-An example of such a deployment can be seen in [this example](https://github.com/SkipLabs/skip/tree/main/examples/hackernews); `./compose.distributed.yml` and `./reverse-proxy/haproxy.distributed.cfg` show a configuration with equivalent client-visible behavior to `compose.yml` and `reverse-proxy/haproxy.cfg` but running with one leader and three followers instead of just one reactive service.
+An example of such a deployment can be seen in [this example](https://github.com/SkipLabs/skip/tree/main/examples/hackernews); `./compose.distributed.yml` and `./reverse_proxy/haproxy.distributed.cfg` show a configuration with equivalent client-visible behavior to `compose.yml` and `reverse_proxy/haproxy.cfg` but running with one leader and three followers instead of just one reactive service.
 
 This *leader-follower* configuration is just one simple example of a distributed reactive system; more complex custom topologies can be set up for different workloads or application designs, using [`SkipExternalService`](api/helpers/classes/SkipExternalService) to specify inter-dependencies among reactive services as needed.
