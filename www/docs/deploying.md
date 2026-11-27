@@ -73,7 +73,18 @@ To handle that scenario, you can run your Skip service in a *leader-follower* to
     * one *leader* instance to maintain the shared computation graph and/or pull in data from external dependencies like databases or polled APIs, and
     * one or more *followers* which synchronize that shared data from the leader, among which resource instances are distributed.
 
-Utilities are available to run a typed `SkipService<InputDefs, ResourceInputs>` in [leader](api/helpers/functions/asLeader) or [follower](api/helpers/functions/asFollower) mode (`asFollower` checks its `collections` and `lazies` keys against `keyof ResourceInputs & string`), making it easy to scale out from a single-machine deployment to a distributed one.
+Utilities are available to run a typed `SkipService<InputDefs, ResourceInputs>` in [leader](api/helpers/functions/asLeader) or [follower](api/helpers/functions/asFollower) mode, making it easy to scale out from a single-machine deployment to a distributed one.
+In `asFollower`, `collections` may name only eager collections in `ResourceInputs` and must list all of them (checked statically for literal arrays), while any lazy collections in `ResourceInputs` are rebuilt locally via typed `lazies` factories `(context: Context) => ResourceInputs[K]`:
+
+```typescript
+const follower = asFollower(service, {
+  leader: { host: "skip_leader", streaming_port: 8080, control_port: 8081 },
+  collections: ["users", "activeMembers"],
+  // If `ResourceInputs` includes lazy collections, rebuild each locally:
+  // lazies: { myLazy: (ctx) => ctx.createLazyCollection(MyLazyCompute) },
+});
+await runService(follower);
+```
 
 An example of such a deployment can be seen in [this example](https://github.com/SkipLabs/skip/tree/main/examples/hackernews); `./compose.distributed.yml` and `./reverse-proxy/haproxy.distributed.cfg` show a configuration with equivalent client-visible behavior to `compose.yml` and `reverse-proxy/haproxy.cfg` but running with one leader and three followers instead of just one reactive service.
 
