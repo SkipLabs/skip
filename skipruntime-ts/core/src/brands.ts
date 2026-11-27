@@ -7,13 +7,13 @@
  * cannot name the keys to forge a structurally matching value: object literals
  * and other look-alikes are rejected, making the bases nominal.
  *
- * @internal
+ * Intentionally NOT tagged `@internal`: `api.ts` references these symbols in
+ * public abstract classes, so `stripInternal` would strip their declarations
+ * and corrupt the emitted `.d.ts`.
+ *
  * @packageDocumentation
  */
 
-/** @internal */
 export declare const eagerCollectionBrand: unique symbol;
-/** @internal */
 export declare const lazyCollectionBrand: unique symbol;
-/** @internal */
 export declare const inputDefinitionBrand: unique symbol;

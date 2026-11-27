@@ -32,8 +32,9 @@ import type {
  * types can be stored together in a `NamedEagerCollections` map.
  *
  * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
- * so only collections created by the Skip runtime (or explicit casts) inhabit
- * this type; object literals and other structural look-alikes are rejected.
+ * so only subclasses (such as runtime-created `EagerCollection` instances)
+ * inhabit this type; object literals and other structural look-alikes are
+ * rejected.
  */
 export abstract class AbstractEagerCollection {
   declare readonly [eagerCollectionBrand]: never;
@@ -43,8 +44,9 @@ export abstract class AbstractEagerCollection {
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
  * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
- * so only collections created by the Skip runtime (or explicit casts) inhabit
- * this type; object literals and other structural look-alikes are rejected.
+ * so only subclasses (such as runtime-created `LazyCollection` instances)
+ * inhabit this type; object literals and other structural look-alikes are
+ * rejected.
  */
 export abstract class AbstractLazyCollection {
   declare readonly [lazyCollectionBrand]: never;
@@ -562,25 +564,27 @@ export type InputCollections<Defs> = {
 /**
  * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
  *
- * `T` must be a plain record: arrays (and tuples) are rejected via the
- * `length?: never` member, since the runtime builds plain objects keyed by
- * collection name.
+ * `T` must be a plain record: arrays, tuples, and other iterables are rejected
+ * via the `[Symbol.iterator]?: never` member, since the runtime builds plain
+ * objects keyed by collection name (while still allowing a collection named
+ * `length`).
  */
 export type AllInputDefs<T> = {
   readonly [K in keyof T]: AbstractInputDefinition;
-} & { readonly length?: never };
+} & { readonly [Symbol.iterator]?: never };
 
 /**
  * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
  * `AbstractLazyCollection`.
  *
- * `T` must be a plain record: arrays (and tuples) are rejected via the
- * `length?: never` member, since the runtime builds plain objects keyed by
- * collection name.
+ * `T` must be a plain record: arrays, tuples, and other iterables are rejected
+ * via the `[Symbol.iterator]?: never` member, since the runtime builds plain
+ * objects keyed by collection name (while still allowing a collection named
+ * `length`).
  */
 export type AllSharedCollections<T> = {
   readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
-} & { readonly length?: never };
+} & { readonly [Symbol.iterator]?: never };
 
 /**
  * Resource provided by a `SkipService`.

@@ -151,4 +151,39 @@ describe("asFollower", () => {
       "asFollower: `lazies` entries must be functions producing a lazy collection: other.",
     );
   });
+
+  it("rejects null, primitive, or array `lazies` with SkipError", () => {
+    for (const badLazies of [null, 42, "echo", []]) {
+      const config = {
+        leader,
+        collections: ["names"],
+        lazies: badLazies,
+      } as unknown as Parameters<
+        typeof asFollower<
+          typeof service.inputs,
+          ResourceInputs,
+          readonly ["names"]
+        >
+      >[1];
+      expect(() => asFollower(service, config)).toThrow(
+        SkipError,
+        "asFollower: `lazies` must be an object mapping collection names to factory functions.",
+      );
+    }
+  });
+
+  it("ignores `undefined` entries in `lazies` consistently with createGraph", () => {
+    const config = {
+      leader,
+      collections: ["names"],
+      lazies: { names: undefined, other: undefined },
+    } as unknown as Parameters<
+      typeof asFollower<
+        typeof service.inputs,
+        ResourceInputs,
+        readonly ["names"]
+      >
+    >[1];
+    expect(() => asFollower(service, config)).not.toThrow();
+  });
 });
