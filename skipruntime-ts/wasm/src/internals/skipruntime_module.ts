@@ -11,6 +11,7 @@ import type {
 import type * as Internal from "@skipruntime/core/internal.js";
 import type {
   AnySkipService,
+  ServiceOptions,
   Reducer,
   Mapper,
   LazyCompute,
@@ -209,7 +210,10 @@ export interface FromWasm {
   ): ptr<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(service: ptr<Internal.Service>): ptr<Internal.CJSON>;
+  SkipRuntime_initService(
+    service: ptr<Internal.Service>,
+    checkReducers: boolean,
+  ): ptr<Internal.CJSON>;
 
   // closeClose
   SkipRuntime_closeService(): Handle<Error> | Handle<Promise<void>>;
@@ -715,8 +719,9 @@ export class WasmFromBinding implements FromBinding {
 
   SkipRuntime_initService(
     service: Pointer<Internal.Service>,
+    checkReducers: boolean,
   ): Pointer<Internal.CJSON> {
-    return this.fromWasm.SkipRuntime_initService(toPtr(service));
+    return this.fromWasm.SkipRuntime_initService(toPtr(service), checkReducers);
   }
 
   SkipRuntime_closeService(): Handle<Error> | Handle<Promise<void>> {
@@ -1098,11 +1103,15 @@ export class ServiceInstanceFactory implements Shared {
   constructor(
     private readonly init: (
       service: AnySkipService,
+      options?: ServiceOptions,
     ) => Promise<ServiceInstance>,
   ) {}
 
-  initService(service: AnySkipService): Promise<ServiceInstance> {
-    return this.init(service);
+  initService(
+    service: AnySkipService,
+    options?: ServiceOptions,
+  ): Promise<ServiceInstance> {
+    return this.init(service, options);
   }
 
   getName() {

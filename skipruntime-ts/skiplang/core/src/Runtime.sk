@@ -150,12 +150,18 @@ fun buildResourcesGraph(
   )
 }
 
-fun initService(service: Service): Result<Array<Waitable>, .Exception> {
+fun initService(
+  service: Service,
+  checkReducers: Bool = false,
+): Result<Array<Waitable>, .Exception> {
   if (!SKStore.gHasContext()) {
     SKStore.gContextInit(initCtx());
   };
   runId = Ksuid::create().toString();
   runWithResult(context ~> {
+    context.!checkReducers =
+      checkReducers ||
+      Environ.varOpt("SKSTORE_CHECK_REDUCERS").isSome();
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
         SKStore.UnitID::keyType,

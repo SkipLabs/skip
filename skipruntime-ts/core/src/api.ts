@@ -673,3 +673,17 @@ export type AnySkipService = SkipService<
   NamedEagerCollections,
   SharedCollections
 >;
+
+/**
+ * Configuration options for initializing a Skip service.
+ */
+export type ServiceOptions = {
+  /**
+   * When enabled, verifies that every non-`null` result returned by a `Reducer`'s `remove` method
+   * matches the result of recomputing the accumulated value from `initial` using `add`.
+   *
+   * This check is expensive and intended for debugging and testing.
+   * Defaults to `false` (or `true` when the `SKIP_CHECK_REDUCERS` environment variable is set in Node).
+   */
+  readonly checkReducers?: boolean;
+};

@@ -35,6 +35,7 @@ import {
   type Reducer,
   type Resource,
   type AnySkipService,
+  type ServiceOptions,
   type Watermark,
   type ExternalService,
   InputDefinition,
@@ -617,10 +618,18 @@ class ContextImpl implements Context {
 }
 
 export class ServiceInstanceFactory {
-  constructor(private init: (service: AnySkipService) => ServiceInstance) {}
+  constructor(
+    private init: (
+      service: AnySkipService,
+      options?: ServiceOptions,
+    ) => ServiceInstance,
+  ) {}
 
-  initService(service: AnySkipService): ServiceInstance {
-    return this.init(service);
+  initService(
+    service: AnySkipService,
+    options?: ServiceOptions,
+  ): ServiceInstance {
+    return this.init(service, options);
   }
 }
 
@@ -1440,18 +1449,22 @@ export class ToBinding {
     this.handles.deleteHandle(reducer);
   }
 
-  async initService(service: AnySkipService): Promise<ServiceInstance> {
+  async initService(
+    service: AnySkipService,
+    options?: ServiceOptions,
+  ): Promise<ServiceInstance> {
     this.setFork(null);
     const uuid = crypto.randomUUID();
     this.fork(uuid);
     const definition = new ServiceDefinition(service);
     const skservicehHdl = this.handles.register(definition);
+    const checkReducers = options?.checkReducers ?? false;
     try {
       this.initializing = true;
       this.setFork(uuid);
       await this.runAsync(() => {
         const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
-        return this.binding.SkipRuntime_initService(skservice);
+        return this.binding.SkipRuntime_initService(skservice, checkReducers);
       });
       this.setFork(uuid);
       this.merge();

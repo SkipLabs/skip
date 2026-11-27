@@ -19,7 +19,7 @@ type AddOn = {
 
 const skip_runtime: AddOn = require("../build/Release/skip_runtime.node");
 
-import type { AnySkipService } from "@skipruntime/core";
+import type { AnySkipService, ServiceOptions } from "@skipruntime/core";
 
 const jsonBinding: JsonBinding = skip_runtime.getJsonBinding();
 const jsonConverter = buildJsonConverter(jsonBinding);
@@ -31,10 +31,28 @@ const tobinding = new ToBinding(
   skip_runtime.getErrorObject,
 );
 
-export function initService(service: AnySkipService): Promise<ServiceInstance> {
+function isEnvEnabled(value: string | undefined): boolean {
+  return (
+    value !== undefined &&
+    value !== "" &&
+    value !== "0" &&
+    value.toLowerCase() !== "false"
+  );
+}
+
+export function initService(
+  service: AnySkipService,
+  options?: ServiceOptions,
+): Promise<ServiceInstance> {
   skip_runtime.initSkipRuntimeToBinding(tobinding);
+  const resolvedOptions: ServiceOptions = {
+    ...options,
+    checkReducers:
+      options?.checkReducers ??
+      isEnvEnabled(process.env["SKIP_CHECK_REDUCERS"]),
+  };
   try {
-    return Promise.resolve(tobinding.initService(service));
+    return Promise.resolve(tobinding.initService(service, resolvedOptions));
   } catch (e: unknown) {
     return Promise.reject<ServiceInstance>(e as Error);
   }
