@@ -335,3 +335,153 @@ int64_t SKIP_parallel_map_worker_id(void) {
 _Bool SKIP_parallel_map_native(void) {
   return 0;
 }
+
+// 128-bit integer compiler-rt helpers for wasm32 (built with -nostdlibinc and
+// linked without libclang_rt.builtins). LLVM lowers `mul`, `sdiv`, `udiv`,
+// `srem`, `urem`, and variable shifts on `i128` to calls to these symbols on
+// wasm32. Marked `used` so LLVM LTO does not dead-strip them before llc
+// codegen introduces the libcalls.
+typedef __int128 ti_int;
+typedef unsigned __int128 tu_int;
+
+static uint64_t skip_u128_lo(tu_int x) {
+  return (uint64_t)x;
+}
+static uint64_t skip_u128_hi(tu_int x) {
+  return (uint64_t)(x >> 64);
+}
+static tu_int skip_make_u128(uint64_t lo, uint64_t hi) {
+  return ((tu_int)hi << 64) | lo;
+}
+
+__attribute__((used)) tu_int __multi3(tu_int a, tu_int b) {
+  uint64_t a_lo = skip_u128_lo(a);
+  uint64_t a_hi = skip_u128_hi(a);
+  uint64_t b_lo = skip_u128_lo(b);
+  uint64_t b_hi = skip_u128_hi(b);
+
+  uint64_t a0 = a_lo & 0xFFFFFFFFULL;
+  uint64_t a1 = a_lo >> 32;
+  uint64_t b0 = b_lo & 0xFFFFFFFFULL;
+  uint64_t b1 = b_lo >> 32;
+
+  uint64_t p00 = a0 * b0;
+  uint64_t p01 = a0 * b1;
+  uint64_t p10 = a1 * b0;
+  uint64_t p11 = a1 * b1;
+
+  uint64_t mid = (p00 >> 32) + (p01 & 0xFFFFFFFFULL) + (p10 & 0xFFFFFFFFULL);
+  uint64_t lo = (p00 & 0xFFFFFFFFULL) | (mid << 32);
+  uint64_t hi =
+      p11 + (p01 >> 32) + (p10 >> 32) + (mid >> 32) + a_lo * b_hi + a_hi * b_lo;
+  return skip_make_u128(lo, hi);
+}
+
+__attribute__((used)) tu_int __ashlti3(tu_int a, int b) {
+  uint32_t s = (uint32_t)b & 127U;
+  if (s == 0) {
+    return a;
+  }
+  uint64_t lo = skip_u128_lo(a);
+  uint64_t hi = skip_u128_hi(a);
+  if (s >= 64) {
+    return skip_make_u128(0, lo << (s - 64));
+  }
+  return skip_make_u128(lo << s, (hi << s) | (lo >> (64 - s)));
+}
+
+__attribute__((used)) tu_int __lshrti3(tu_int a, int b) {
+  uint32_t s = (uint32_t)b & 127U;
+  if (s == 0) {
+    return a;
+  }
+  uint64_t lo = skip_u128_lo(a);
+  uint64_t hi = skip_u128_hi(a);
+  if (s >= 64) {
+    return skip_make_u128(hi >> (s - 64), 0);
+  }
+  return skip_make_u128((lo >> s) | (hi << (64 - s)), hi >> s);
+}
+
+__attribute__((used)) ti_int __ashrti3(ti_int a, int b) {
+  uint32_t s = (uint32_t)b & 127U;
+  if (s == 0) {
+    return a;
+  }
+  uint64_t lo = skip_u128_lo((tu_int)a);
+  int64_t hi = (int64_t)skip_u128_hi((tu_int)a);
+  if (s >= 64) {
+    return (ti_int)skip_make_u128((uint64_t)(hi >> (s - 64)),
+                                  (uint64_t)(hi >> 63));
+  }
+  return (ti_int)skip_make_u128((lo >> s) | ((uint64_t)hi << (64 - s)),
+                                (uint64_t)(hi >> s));
+}
+
+static tu_int skip_udivmodti4(tu_int a, tu_int b, tu_int* rem) {
+  if (b > a) {
+    if (rem) {
+      *rem = a;
+    }
+    return 0;
+  }
+  uint64_t a_hi = skip_u128_hi(a);
+  uint64_t b_hi = skip_u128_hi(b);
+  uint64_t a_lo = skip_u128_lo(a);
+  uint64_t b_lo = skip_u128_lo(b);
+  if (b_hi == 0 && a_hi == 0) {
+    if (rem) {
+      *rem = (tu_int)(a_lo % b_lo);
+    }
+    return (tu_int)(a_lo / b_lo);
+  }
+  int lz_a =
+      a_hi ? __builtin_clzll(a_hi) : (64 + (a_lo ? __builtin_clzll(a_lo) : 64));
+  int lz_b =
+      b_hi ? __builtin_clzll(b_hi) : (64 + (b_lo ? __builtin_clzll(b_lo) : 64));
+  int shift = lz_b - lz_a;
+  tu_int q = 0;
+  tu_int r = a;
+  tu_int d = __ashlti3(b, shift);
+  for (int i = shift; i >= 0; --i) {
+    q = q << 1;
+    if (r >= d) {
+      r -= d;
+      q |= 1;
+    }
+    d = d >> 1;
+  }
+  if (rem) {
+    *rem = r;
+  }
+  return q;
+}
+
+__attribute__((used)) tu_int __udivti3(tu_int a, tu_int b) {
+  return skip_udivmodti4(a, b, (tu_int*)0);
+}
+
+__attribute__((used)) tu_int __umodti3(tu_int a, tu_int b) {
+  tu_int r = 0;
+  skip_udivmodti4(a, b, &r);
+  return r;
+}
+
+__attribute__((used)) ti_int __divti3(ti_int a, ti_int b) {
+  int neg_a = a < 0;
+  int neg_b = b < 0;
+  tu_int ua = neg_a ? -(tu_int)a : (tu_int)a;
+  tu_int ub = neg_b ? -(tu_int)b : (tu_int)b;
+  tu_int q = skip_udivmodti4(ua, ub, (tu_int*)0);
+  return (neg_a != neg_b) ? (ti_int)(-q) : (ti_int)q;
+}
+
+__attribute__((used)) ti_int __modti3(ti_int a, ti_int b) {
+  int neg_a = a < 0;
+  int neg_b = b < 0;
+  tu_int ua = neg_a ? -(tu_int)a : (tu_int)a;
+  tu_int ub = neg_b ? -(tu_int)b : (tu_int)b;
+  tu_int r = 0;
+  skip_udivmodti4(ua, ub, &r);
+  return neg_a ? (ti_int)(-r) : (ti_int)r;
+}

@@ -1,0 +1,162 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+value class UInt128 private (
+  private value: Int128,
+) uses Orderable, Show, Hashable {
+  static fun fromInt128(n: Int128): UInt128 {
+    UInt128(n)
+  }
+
+  static fun fromUInt64(n: Int): UInt128 {
+    UInt128(Int128::fromUInt64(n))
+  }
+
+  static fun fromHalves(lo: Int, hi: Int): UInt128 {
+    UInt128(Int128::fromHalves(lo, hi))
+  }
+
+  fun toInt128(): Int128 {
+    this.value
+  }
+
+  fun lo(): Int {
+    this.value.lo()
+  }
+
+  fun hi(): Int {
+    this.value.hi()
+  }
+
+  fun toInt(): Int {
+    this.value.toInt()
+  }
+
+  static fun zero(): UInt128 {
+    UInt128(Int128::zero())
+  }
+
+  static fun one(): UInt128 {
+    UInt128(Int128::one())
+  }
+
+  static fun min(): UInt128 {
+    UInt128(Int128::zero())
+  }
+
+  static fun max(): UInt128 {
+    UInt128(Int128::fromInt(-1))
+  }
+
+  fun ==(other: UInt128): Bool {
+    this.value == other.value
+  }
+
+  fun !=(other: UInt128): Bool {
+    this.value != other.value
+  }
+
+  fun +(other: UInt128): UInt128 {
+    UInt128(this.value + other.value)
+  }
+
+  fun -(other: UInt128): UInt128 {
+    UInt128(this.value - other.value)
+  }
+
+  fun *(other: UInt128): UInt128 {
+    UInt128(this.value * other.value)
+  }
+
+  fun /(other: UInt128): UInt128 {
+    UInt128(this.value.udiv(other.value))
+  }
+
+  fun %(other: UInt128): UInt128 {
+    UInt128(this.value.urem(other.value))
+  }
+
+  fun <(other: UInt128): Bool {
+    this.value.ult(other.value)
+  }
+
+  fun >(other: UInt128): Bool {
+    this.value.ugt(other.value)
+  }
+
+  fun <=(other: UInt128): Bool {
+    this.value.ule(other.value)
+  }
+
+  fun >=(other: UInt128): Bool {
+    this.value.uge(other.value)
+  }
+
+  fun and(other: UInt128): UInt128 {
+    UInt128(this.value.and(other.value))
+  }
+
+  fun or(other: UInt128): UInt128 {
+    UInt128(this.value.or(other.value))
+  }
+
+  fun xor(other: UInt128): UInt128 {
+    UInt128(this.value.xor(other.value))
+  }
+
+  fun not(): UInt128 {
+    UInt128(this.value.not())
+  }
+
+  fun shl<I: Integral>(count: I): UInt128 {
+    UInt128(this.value.shl(count))
+  }
+
+  fun shr<I: Integral>(count: I): UInt128 {
+    UInt128(this.value.ushr(count))
+  }
+
+  fun ushr<I: Integral>(count: I): UInt128 {
+    UInt128(this.value.ushr(count))
+  }
+
+  fun clz(): Int {
+    this.value.clz()
+  }
+
+  fun ctz(): Int {
+    this.value.ctz()
+  }
+
+  fun popcount(): Int {
+    this.value.popcount()
+  }
+
+  fun compare(other: UInt128): Order {
+    if (this < other) LT() else if (this == other) EQ() else GT()
+  }
+
+  fun hash(): Int {
+    this.value.hash()
+  }
+
+  fun toStringHex(): String {
+    this.value.toStringHex()
+  }
+
+  fun toStringBinary(): String {
+    this.value.toStringBinary()
+  }
+
+  fun toString(): String {
+    Int128::unsignedToString(this.value)
+  }
+
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString())
+  }
+}
