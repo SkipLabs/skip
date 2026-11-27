@@ -640,6 +640,42 @@ class JSONReducer(
       getInfoOfReducer(this.eptr.value).prettyPrint(),
     )}`
   }
+
+  private fun getDisplayName(dirName: SKStore.DirName): String {
+    SKJSON.getString(getInfoOfReducer(this.eptr.value), "name").default(
+      dirName.toString(),
+    )
+  }
+
+  fun checkUpdate(
+    dirName: SKStore.DirName,
+    key: SKStore.Key,
+    incremental: Array<SKStore.File>,
+    expected: Array<SKStore.File>,
+  ): void {
+    if (
+      incremental.size() == expected.size() &&
+      Range(0, incremental.size()).all(i ->
+        JSONFile::type(incremental[i]).json.compare(
+          JSONFile::type(expected[i]).json,
+        ) == EQ()
+      )
+    ) {
+      return void;
+    };
+    formatValues = (values: Array<SKStore.File>) ->
+      if (values.size() == 1) {
+        JSONFile::type(values[0]).json.prettyPrint()
+      } else {
+        `[${values.map(v -> JSONFile::type(v).json.prettyPrint()).join(", ")}]`
+      };
+    throw SKStore.ReducerMismatchException(
+      this.getDisplayName(dirName),
+      key.toString(),
+      formatValues(incremental),
+      formatValues(expected),
+    )
+  }
 }
 
 /************  Runtime ****************/
@@ -848,8 +884,11 @@ fun useExternalResource(
 /************ initService ****************/
 
 @export("SkipRuntime_initService")
-fun initSkipRuntimeService(service: Service): SKJSON.CJSON {
-  initService(service) match {
+fun initSkipRuntimeService(
+  service: Service,
+  checkReducers: Int32,
+): SKJSON.CJSON {
+  initService(service, checkReducers != 0) match {
   | Success(handles) ->
     SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
