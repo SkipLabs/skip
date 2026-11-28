@@ -233,6 +233,21 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-macos-persistent-heap
 ```
 
+# Native XXHash64
+
+`XXHash64.xxHash64String` calls `SKIP_xxhash64_string` (`xxhash64.c`), a
+standard 64-bit XXH64 implementation with no libc dependencies beyond `memcpy`.
+`xxhash64_native.c` runs under UBSan on every platform (including macOS) to
+check reference XXH64 test vectors across boundary lengths (0..100), both zero
+and non-zero seeds, embedded NUL bytes, and unaligned byte offsets.
+
+```sh
+clang -std=c2x -O2 -g -Wall -Wextra -Werror \
+  -Iskiplang/prelude/runtime -fsanitize=undefined -fsanitize-trap=all \
+  skiplang/prelude/runtime/tests/xxhash64_native.c -o /tmp/xxhash64-native
+/tmp/xxhash64-native
+```
+
 # Wasm Float.toString
 
 `Float.toString` formats with `SKIP_Float_toStringShortest` (`string.c`), which
