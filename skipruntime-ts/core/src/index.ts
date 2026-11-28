@@ -275,6 +275,14 @@ export class Stack {
   }
 }
 
+function formatKey(key: Json): string {
+  try {
+    return JSON.stringify(key);
+  } catch {
+    return "<unserializable key>";
+  }
+}
+
 class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements LazyCollection<K, V>
@@ -307,10 +315,14 @@ class LazyCollectionImpl<K extends Json, V extends Json>
         return values[0]!;
       case 0:
         if (_default?.ifNone !== undefined) return deepFreeze(_default.ifNone);
-        throw new SkipNonUniqueValueError();
+        throw new SkipNonUniqueValueError(
+          `Key ${formatKey(key)} not found in lazy collection '${this.lazyCollection}'.`,
+        );
       default:
         if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
-        throw new SkipNonUniqueValueError();
+        throw new SkipNonUniqueValueError(
+          `Key ${formatKey(key)} has ${values.length} values in lazy collection '${this.lazyCollection}', expected 1.`,
+        );
     }
   }
 
@@ -351,10 +363,14 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
         return values[0]!;
       case 0:
         if (_default?.ifNone !== undefined) return deepFreeze(_default.ifNone);
-        throw new SkipNonUniqueValueError();
+        throw new SkipNonUniqueValueError(
+          `Key ${formatKey(key)} not found in collection '${this.collection}'.`,
+        );
       default:
         if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
-        throw new SkipNonUniqueValueError();
+        throw new SkipNonUniqueValueError(
+          `Key ${formatKey(key)} has ${values.length} values in collection '${this.collection}', expected 1.`,
+        );
     }
   }
 
@@ -1068,6 +1084,7 @@ class ValuesImpl<T> implements Values<T> {
     private readonly skjson: JsonConverter,
     private readonly binding: FromBinding,
     private pointer: Pointer<Internal.NonEmptyIterator> | null,
+    private readonly key?: Json,
   ) {
     this.pointer = pointer;
   }
@@ -1094,13 +1111,20 @@ class ValuesImpl<T> implements Values<T> {
       this.next();
     }
     const first = this.materialized[0];
-    if (
-      first === undefined /* i.e. this.materialized.length == 0 */ ||
-      this.materialized.length >= 2 ||
-      this.next() !== null
-    ) {
+    if (first === undefined /* i.e. this.materialized.length == 0 */) {
+      const forKey =
+        this.key !== undefined ? ` for key ${formatKey(this.key)}` : "";
+      throw new SkipNonUniqueValueError(
+        `No values found${forKey}, expected 1.`,
+      );
+    }
+    if (this.materialized.length >= 2 || this.next() !== null) {
       if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
-      throw new SkipNonUniqueValueError();
+      const forKey =
+        this.key !== undefined ? ` for key ${formatKey(this.key)}` : "";
+      throw new SkipNonUniqueValueError(
+        `Multiple values found${forKey}, expected 1.`,
+      );
     }
     return first;
   }
@@ -1197,9 +1221,10 @@ export class ToBinding {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
     const context = new ContextImpl(this);
+    const importedKey = skjson.importJSON(key) as Json;
     const result = mapper.object.mapEntry(
-      skjson.importJSON(key) as Json,
-      new ValuesImpl<Json>(skjson, this.binding, values),
+      importedKey,
+      new ValuesImpl<Json>(skjson, this.binding, values, importedKey),
       context,
     );
     return skjson.exportJSON(Array.from(result));

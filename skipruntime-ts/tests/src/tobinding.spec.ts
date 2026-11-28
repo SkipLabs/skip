@@ -1,16 +1,22 @@
 import { expect } from "earl";
 import {
+  EagerCollectionImpl,
   InputDefinition,
   LoadStatus,
   ServiceDefinition,
   ServiceInstanceImpl,
+  SkipNonUniqueValueError,
   SubscriptionID,
   ToBinding,
   Watermark,
   type AnySkipService,
   type ChangeManager,
   type ExternalService,
+  type HandlerInfo,
+  type JSONLazyCompute,
+  type JSONMapper,
 } from "@skipruntime/core";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 import type { FromBinding, Handle } from "@skipruntime/core/binding.js";
 import type { Json, JsonConverter, Pointer } from "@skipruntime/core/json.js";
 import type * as Internal from "@skipruntime/core/internal.js";
@@ -331,6 +337,161 @@ describe("ToBinding", () => {
       instance.subscribe("res-4", notifier, new Watermark("wm-obj"));
 
       expect(seenWatermarks).toEqual([null, null, "wm-str", "wm-obj"]);
+    });
+  });
+
+  describe("SkipNonUniqueValueError messages", () => {
+    it("sets SkipError subclass name on instances", () => {
+      const err = new SkipNonUniqueValueError("test");
+      expect(err.name).toEqual("SkipNonUniqueValueError");
+      expect(err).toBeA(SkipNonUniqueValueError);
+    });
+
+    it("reports key and collection for EagerCollection.getUnique when key is missing or has multiple values", () => {
+      const data = new Map<string, Json[]>([
+        [JSON.stringify("one"), [42]],
+        [JSON.stringify("many"), [1, 2, 3]],
+      ]);
+      const { toBinding, converter } = makeBinding({
+        SkipRuntime_Collection__getArray: (_coll, keyPtr) => {
+          const key = converter.importJSON(keyPtr);
+          const vals = data.get(JSON.stringify(key)) ?? [];
+          return converter.exportJSON(
+            vals,
+          ) as unknown as Pointer<Internal.CJArray>;
+        },
+      });
+      const coll = new EagerCollectionImpl<Json, Json>("users", toBinding);
+
+      expect(coll.getUnique("one")).toEqual(42);
+      expect(coll.getUnique("missing", { ifNone: 0 })).toEqual(0);
+      expect(coll.getUnique("many", { ifMany: -1 })).toEqual(-1);
+
+      expect(() => coll.getUnique("missing")).toThrow(
+        SkipNonUniqueValueError,
+        `Key "missing" not found in collection 'users'.`,
+      );
+      expect(() => coll.getUnique({ id: 7 })).toThrow(
+        SkipNonUniqueValueError,
+        `Key {"id":7} not found in collection 'users'.`,
+      );
+      expect(() => coll.getUnique("many")).toThrow(
+        SkipNonUniqueValueError,
+        `Key "many" has 3 values in collection 'users', expected 1.`,
+      );
+    });
+
+    it("reports key and collection for LazyCollection.getUnique when key is missing or has multiple values", () => {
+      const data = new Map<string, Json[]>([
+        [JSON.stringify("one"), [99]],
+        [JSON.stringify("many"), [1, 2]],
+      ]);
+      const { toBinding, converter } = makeBinding({
+        SkipRuntime_LazyCollection__getArray: (_coll, keyPtr) => {
+          const key = converter.importJSON(keyPtr);
+          const vals = data.get(JSON.stringify(key)) ?? [];
+          return converter.exportJSON(
+            vals,
+          ) as unknown as Pointer<Internal.CJArray>;
+        },
+      });
+
+      const runCompute = (lookupKey: Json) => {
+        const computeInfo: HandlerInfo<JSONLazyCompute> = {
+          name: "TestLazy",
+          params: [],
+          object: {
+            compute: (self, _k) => [self.getUnique(lookupKey)],
+          },
+        };
+        const hdl = toBinding.register(computeInfo);
+        toBinding.SkipRuntime_LazyCompute__compute(
+          hdl,
+          "lazy_users",
+          converter.exportJSON("trigger"),
+        );
+      };
+
+      expect(() => runCompute("one")).not.toThrow();
+      expect(() => runCompute("missing")).toThrow(
+        SkipNonUniqueValueError,
+        `Key "missing" not found in lazy collection 'lazy_users'.`,
+      );
+      expect(() => runCompute("many")).toThrow(
+        SkipNonUniqueValueError,
+        `Key "many" has 2 values in lazy collection 'lazy_users', expected 1.`,
+      );
+    });
+
+    it("reports key for Values.getUnique when multiple values exist", () => {
+      const sequences: Json[][] = [[10], [10, 20], []];
+      const cursors = new Map<number, number>();
+      const { toBinding, converter } = makeBinding({
+        SkipRuntime_NonEmptyIterator__next: (iterPtr) => {
+          const id = iterPtr as unknown as number;
+          const seq = sequences[id]!;
+          const idx = cursors.get(id) ?? 0;
+          if (idx >= seq.length) return null;
+          cursors.set(id, idx + 1);
+          return converter.exportJSON(seq[idx]!);
+        },
+      });
+
+      const runMapper = (seqId: number, key: Json) => {
+        const mapperInfo: HandlerInfo<JSONMapper> = {
+          name: "TestMapper",
+          params: [],
+          object: {
+            mapEntry: (k, values) => [[k, values.getUnique()]],
+          },
+        };
+        const hdl = toBinding.register(mapperInfo);
+        toBinding.SkipRuntime_Mapper__mapEntry(
+          hdl,
+          converter.exportJSON(key),
+          seqId as unknown as Pointer<Internal.NonEmptyIterator>,
+        );
+      };
+
+      expect(() => runMapper(0, "k1")).not.toThrow();
+      expect(() => runMapper(1, "k2")).toThrow(
+        SkipNonUniqueValueError,
+        `Multiple values found for key "k2", expected 1.`,
+      );
+      expect(() => runMapper(2, "k3")).toThrow(
+        SkipNonUniqueValueError,
+        `No values found for key "k3", expected 1.`,
+      );
+    });
+
+    it("reports key and resource for SkipServiceBroker.getUnique", async () => {
+      const broker = new SkipServiceBroker({
+        host: "localhost",
+        control_port: 8081,
+        streaming_port: 8080,
+      });
+      const responses = new Map<string, Json[]>([
+        [JSON.stringify("one"), ["v"]],
+        [JSON.stringify("many"), ["a", "b"]],
+      ]);
+      broker.getArray = (<K extends Json, V extends Json>(
+        _resource: string,
+        _params: Json,
+        key: K,
+      ): Promise<V[]> =>
+        Promise.resolve(
+          (responses.get(JSON.stringify(key)) ?? []) as V[],
+        )) as typeof broker.getArray;
+
+      expect(await broker.getUnique("users", {}, "one")).toEqual("v");
+      await expect(broker.getUnique("users", {}, "missing")).toBeRejectedWith(
+        SkipNonUniqueValueError,
+        `Key "missing" not found in resource 'users'.`,
+      );
+      await expect(broker.getUnique("users", {}, "many")).toBeRejectedWith(
+        SkipNonUniqueValueError,
+        `Key "many" has 2 values in resource 'users', expected 1.`,
+      );
     });
   });
 });

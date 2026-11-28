@@ -1091,6 +1091,37 @@ function lazyWithUseExternalServiceService() {
   };
 }
 
+//// testGetUniqueErrors
+
+class LookupOtherMapper implements Mapper<string, string, string, number> {
+  constructor(private readonly other: EagerCollection<string, number>) {}
+
+  mapEntry(key: string, values: Values<string>): Iterable<[string, number]> {
+    const target = values.getUnique();
+    return [[key, this.other.getUnique(target)]];
+  }
+}
+
+type Input_SS_SN = {
+  readonly queries: EagerCollection<string, string>;
+  readonly targets: EagerCollection<string, number>;
+};
+
+class LookupOtherResource implements Resource<Input_SS_SN> {
+  instantiate(cs: Input_SS_SN): EagerCollection<string, number> {
+    return cs.queries.map(LookupOtherMapper, cs.targets);
+  }
+}
+
+const getUniqueErrorService = {
+  inputs: {
+    queries: new InputDefinition<string, string>(),
+    targets: new InputDefinition<string, number>(),
+  },
+  resources: { lookup: LookupOtherResource },
+  createGraph: (ic: Input_SS_SN) => ic,
+};
+
 //// testMapWithException
 
 class MapWithException implements Mapper<string, number, string, number> {
@@ -2508,6 +2539,53 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         [0, [[10, 15]]],
         [1, [[20, 30]]],
       ]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testGetUniqueErrors", async () => {
+    const service = await initService(getUniqueErrorService);
+    try {
+      await service.instantiateResource(
+        "unsafe.fixed.resource.ident",
+        "lookup",
+        {},
+      );
+      await service.update("targets", [
+        ["ok", [1]],
+        ["dup", [1, 2]],
+      ]);
+      // Missing key in target collection
+      try {
+        await service.update("queries", [["q1", ["missing"]]]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          /Key "missing" not found in collection '.*targets.*'\./,
+        );
+      }
+      // Duplicate values for key in target collection
+      try {
+        await service.update("queries", [["q2", ["dup"]]]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          /Key "dup" has 2 values in collection '.*targets.*', expected 1\./,
+        );
+      }
+      // Multiple values in mapper Values.getUnique
+      try {
+        await service.update("queries", [["q3", ["ok", "ok"]]]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          /Multiple values found for key "q3", expected 1\./,
+        );
+      }
     } finally {
       await service.close();
     }
