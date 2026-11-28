@@ -1585,10 +1585,10 @@ private fun peepholeIntBinOp(peep: IntBinOp, s: mutable Peephole): Instr {
   lhs = s.getInstr(peep.lhs);
   rhs = s.getInstr(peep.rhs);
 
-  // Constant folding helpers above assume 64-bit Int semantics (wraparound,
+  // Constant folding helpers above assume <=64-bit Int semantics (wraparound,
   // shift mask 63, Int::min/Int::max, constantInt results). Skip them for
-  // wider integer types like Int128 and let LLVM fold those instead.
-  val = if (lhs.typ != tInt) {
+  // Int128 (bitSize > 64) and let LLVM fold those instead.
+  val = if (lhs.typ == tInt128) {
     peep
   } else {
     lhs match {

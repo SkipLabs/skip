@@ -3183,6 +3183,7 @@ private fun llvmWriteStore(
         pos,
     );
 
+    pos.invariant(t.bitSize <= 64, "Unexpected >64-bit bitfield store");
     mask = (1.shl(t.bitSize) - 1);
 
     knownBits = storeValue match {

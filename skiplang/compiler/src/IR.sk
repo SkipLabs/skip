@@ -664,6 +664,9 @@ const kByteConstants: Array<ConstantInt> = Array::fillBy(256, i -> {
   ConstantInt{id => InstrID::none, typ => tInt8, value => sext(i, 8)}
 });
 
+// Integer constant. For tInt128, `value` holds the sign-extended 64-bit
+// integer value (all compiler-synthesized Int128 constants fit in signed i64;
+// full 128-bit values are constructed via Int128::fromHalves or shifts).
 class ConstantInt{value: Int} extends SimpleConstantBase {
   fun constantInteger(): ?Int {
     Some(this.value)

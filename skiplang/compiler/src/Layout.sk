@@ -544,6 +544,14 @@ private fun layoutCppExportClass(
       fieldSClass = s.trackedSClassGet(field.typ.sclassID).sclass;
       scalarType = fieldSClass.getScalarType();
 
+      if (scalarType.bitSize > 64) {
+        field.pos.die(
+          `@cpp_export class field '${field.name}' has type ${fieldSClass}, ` +
+            `which is 8-byte aligned in Skip objects and incompatible with C ` +
+            `__int128's 16-byte alignment; use two Int fields (lo/hi) instead`,
+        )
+      };
+
       // Naturally align the bit offsets
       offset = alignField(nextOffset, scalarType, true);
       !nextOffset = offset + scalarType.bitSize;

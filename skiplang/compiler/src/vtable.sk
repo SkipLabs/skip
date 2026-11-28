@@ -198,9 +198,16 @@ mutable private class VTableBuilderIterator(
   mutable fun next(begin: Int, align: Int): (Int, Int, Bool) {
     env = this.builder.env;
     classReader = this.builder.classReader;
-    end =
-      begin +
-      ClassInputs.getScalarType(this.value.typ, env, classReader).bitSize;
+    bitSize = ClassInputs.getScalarType(
+      this.value.typ,
+      env,
+      classReader,
+    ).bitSize;
+    legalBegin = nextContiguousVTableBitOffset(begin, bitSize, align);
+    if (legalBegin != begin) {
+      return this.next(legalBegin, align)
+    };
+    end = begin + bitSize;
 
     if (this.index >= this.builder.slots.size()) {
       // This is after all existing slots, so no overlap is possible.
@@ -488,9 +495,10 @@ private fun tryPreviousSlot(
 //    logical byte offsets [128, 256) are actually stored at [-128, 0), where
 //    they can still be reached via a signed 8-bit displacement. To keep
 //    the vtable layout a bit denser we store this range "backwards", so byte
-//    offset 128 is physical -8, 128+8 is -16, etc. Reversing is OK since no
-//    vtable entry can span an 8-byte boundary (if they ever do, we'll need
-//    to adjust this mapping).
+//    offset 128 is physical -8, 128+8 is -16, etc. Reversing is OK for entries
+//    up to 64 bits; wider entries (e.g. 128-bit Int128) skip the reversed
+//    [128, 256) range and avoid straddling 256-byte mirror boundaries via
+//    nextContiguousVTableBitOffset so their words stay physically contiguous.
 //
 //    This trick is only applied to the first 256 logical bytes. After that,
 //    increasing logical offsets correspond to increasing physical offsets.
@@ -536,6 +544,34 @@ fun vtableLogicalToPhysicalBitOffset(bo: Int): Int {
   } else {
     mask = (kFrozenMask * 8) - 1;
     (bo.and(mask.not()) * 2 + bo.and(mask)) - 128 * 8
+  }
+}
+
+// Returns the smallest logical bit offset >= begin (aligned to align) where a
+// slot of `bitSize` bits stays physically contiguous after
+// vtableLogicalToPhysicalBitOffset:
+// - entries up to 64 bits never span a 64-bit word boundary;
+// - wider entries (e.g. 128-bit Int128) must neither enter the reversed
+//   [128*8, 256*8) range nor straddle a 256-byte mirror boundary.
+private fun nextContiguousVTableBitOffset(
+  begin: Int,
+  bitSize: Int,
+  align: Int,
+): Int {
+  if (bitSize <= kVTableSlotBitSize) {
+    begin
+  } else if (begin < 256 * 8 && begin + bitSize > 128 * 8) {
+    roundUp(256 * 8, align)
+  } else if (begin >= 256 * 8) {
+    blockBits = kFrozenMask * 8;
+    offsetInBlock = begin.and(blockBits - 1);
+    if (offsetInBlock + bitSize > blockBits) {
+      roundUp(begin - offsetInBlock + blockBits, align)
+    } else {
+      begin
+    }
+  } else {
+    begin
   }
 }
 
@@ -735,35 +771,53 @@ const kVTableSlotByteSize: Int = kVTableSlotBitSize.shr(3);
 // Populate an array of 32-bit masks, one per 256-byte vtable block
 // (skipping mirrors) indicating which vtable offsets this vtable
 // touches.
-private fun computeVTableMask(slots: Array<StaticImageField>): Array<Int> {
+private fun computeVTableMask(
+  slots: Array<StaticImageField>,
+  env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Array<Int> {
   buf = mutable Vector[];
 
   for (slot in slots) {
-    bitOffset = vtableLogicalToPhysicalBitOffset(slot.bitOffset);
-
-    // Which 64-bit object word contains this slot? (it can only be one).
-    // Offset to start from 0.
-    mirroringWordIndex = (bitOffset - kMinVTableBitOffset).shr(
-      kLog2VTableSlotBitSize,
+    bitSize = ClassInputs.getScalarType(
+      slot.value.typ,
+      env,
+      classReader,
+    ).bitSize;
+    numWords = max(
+      1,
+      (bitSize + kVTableSlotBitSize - 1).shr(kLog2VTableSlotBitSize),
     );
+    baseBitOffset = vtableLogicalToPhysicalBitOffset(slot.bitOffset);
 
-    // Splice out the mirrored copies, to make the numbering system dense
-    // for purposes of this search.
-    bpb = kFrozenMask / 8;
-    high = mirroringWordIndex.shr(1).and(-bpb);
-    low = mirroringWordIndex.and(bpb - 1);
-    wordIndex = high.or(low);
+    // Mark every 64-bit word spanned by this slot (1 word for <=64-bit
+    // entries, 2 words for 128-bit entries like Int128; multi-word entries
+    // are guaranteed physically contiguous by nextContiguousVTableBitOffset).
+    for (w in Range(0, numWords)) {
+      bitOffset = baseBitOffset + w * kVTableSlotBitSize;
+      // Offset to start from 0.
+      mirroringWordIndex = (bitOffset - kMinVTableBitOffset).shr(
+        kLog2VTableSlotBitSize,
+      );
 
-    // We pack in 32 bits per array entry.
-    bufIndex = wordIndex.shr(5);
-    if (bufIndex >= buf.size()) {
-      buf.resize(bufIndex + 1, 0)
+      // Splice out the mirrored copies, to make the numbering system dense
+      // for purposes of this search.
+      bpb = kFrozenMask / 8;
+      high = mirroringWordIndex.shr(1).and(-bpb);
+      low = mirroringWordIndex.and(bpb - 1);
+      wordIndex = high.or(low);
+
+      // We pack in 32 bits per array entry.
+      bufIndex = wordIndex.shr(5);
+      if (bufIndex >= buf.size()) {
+        buf.resize(bufIndex + 1, 0)
+      };
+
+      // Set a bit indicating this word is in use by this vtable.
+      inUseMask = 1.shl(wordIndex.and(31));
+
+      buf.set(bufIndex, buf[bufIndex].or(inUseMask));
     };
-
-    // Set a bit indicating this word is in use by this vtable.
-    inUseMask = 1.shl(wordIndex.and(31));
-
-    buf.set(bufIndex, buf[bufIndex].or(inUseMask));
   };
 
   buf.toArray()
@@ -816,22 +870,35 @@ private fun binaryToString(n: Int, numBits: Int = 64): String {
 private fun checkMegamask(
   megaMask: mutable Vector<Int>,
   megaVTable: mutable Vector<StaticImageField>,
+  env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   newMask = mutable Vector[];
 
   for (slot in megaVTable) {
-    bo = slot.bitOffset / 8;
-    if (bo.and(kFrozenMask) == 0) {
-      o = (bo % kFrozenMask) + ((bo / (kFrozenMask * 2)) * kFrozenMask);
+    bitSize = ClassInputs.getScalarType(
+      slot.value.typ,
+      env,
+      classReader,
+    ).bitSize;
+    numWords = max(
+      1,
+      (bitSize + kVTableSlotBitSize - 1).shr(kLog2VTableSlotBitSize),
+    );
+    for (w in Range(0, numWords)) {
+      bo = slot.bitOffset / 8 + w * kVTableSlotByteSize;
+      if (bo.and(kFrozenMask) == 0) {
+        o = (bo % kFrozenMask) + ((bo / (kFrozenMask * 2)) * kFrozenMask);
 
-      word = o / 8;
-      maskIndex = word / 32;
+        word = o / 8;
+        maskIndex = word / 32;
 
-      if (maskIndex >= newMask.size()) {
-        newMask.resize(maskIndex + 1, 0xFFFF00000000FFFF);
-      };
+        if (maskIndex >= newMask.size()) {
+          newMask.resize(maskIndex + 1, 0xFFFF00000000FFFF);
+        };
 
-      newMask.set(maskIndex, newMask[maskIndex].or(1.shl((word % 32) + 16)))
+        newMask.set(maskIndex, newMask[maskIndex].or(1.shl((word % 32) + 16)))
+      }
     }
   };
 
@@ -860,16 +927,18 @@ private fun storeOneVTableInMegaVTable(
   slots: Array<StaticImageField>,
   megaMask: mutable Vector<Int>,
   megaVTable: mutable Vector<StaticImageField>,
+  env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Int {
   debugMode = false;
 
   if (debugMode) {
-    checkMegamask(megaMask, megaVTable)
+    checkMegamask(megaMask, megaVTable, env, classReader)
   };
 
   baseMask = 0xFFFF00000000FFFF;
 
-  vtableMask = computeVTableMask(slots);
+  vtableMask = computeVTableMask(slots, env, classReader);
 
   // This is the slot number (i.e. array entry, treating megaVTable as
   // an array of pointers) where logical & physical vtable entry 0 should
@@ -932,7 +1001,7 @@ private fun storeOneVTableInMegaVTable(
   };
 
   if (debugMode) {
-    checkMegamask(megaMask, megaVTable)
+    checkMegamask(megaMask, megaVTable, env, classReader)
   };
 
   slotNumber * kVTableSlotByteSize
@@ -1011,6 +1080,8 @@ private fun verifyVTableInfo(
 private fun interleaveVTables(
   builders: readonly Vector<mutable VTableBuilder>,
   requestOffsets: Array<Int>,
+  env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): VTableInfo {
   // This is an array of 32-bit Ints, where each Int indicates which 64-bit
   // slots are occupied in that block of 256 vtable bytes (see
@@ -1035,7 +1106,13 @@ private fun interleaveVTables(
       o
     | None() ->
       // Place this VTable into the megaVTable.
-      o = storeOneVTableInMegaVTable(slots, megaMask, megaVTable);
+      o = storeOneVTableInMegaVTable(
+        slots,
+        megaMask,
+        megaVTable,
+        env,
+        classReader,
+      );
 
       // Remember where we placed it, for next time.
       seen.add(slots, o);
@@ -1184,7 +1261,7 @@ fun populateVTables(
     })
   );
 
-  vti = interleaveVTables(buildersVec, bitOffsets.chill());
+  vti = interleaveVTables(buildersVec, bitOffsets.chill(), env, classReader);
 
   verifyVTableInfo(vti, requests, env, classReader);
 
