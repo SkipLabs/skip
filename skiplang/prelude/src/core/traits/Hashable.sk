@@ -18,11 +18,18 @@ trait .Hashable {
   }
 }
 
-// Accumulate hash bits from n into seed. Borrowed from boost::hash_combine,
-// but using a 64 bit version of the golden ratio instead of 32.
+// Accumulate hash bits from n into seed using an asymmetric 1-multiply 64-bit
+// mixer so both inputs diffuse across all 64 bits and combine(a, b) != combine(b, a).
 fun combine<T: Hashable>(seed: Int, n: T): Int {
-  mix = seed.shl(6) + seed.ushr(2);
-  seed.xor(0x9e3779b97f4a7c15 + mix + n.hash())
+  a = seed + 0x9e3779b97f4a7c15;
+  !a = a.xor(a.shl(17));
+  !a = a.xor(a.ushr(11));
+  b = n.hash() + 0x94d049bb133111eb;
+  !b = b.xor(b.shl(23));
+  !b = b.xor(b.ushr(13));
+  x = a + b;
+  !x = x.xor(x.ushr(32)) * 0xbf58476d1ce4e5b9;
+  x.xor(x.ushr(32))
 }
 
 module end;

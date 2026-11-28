@@ -516,11 +516,11 @@ mutable base class .List<+T>
   }
 
   readonly fun hash[T: Hashable](): Int {
-    this.foldl((i, x) -> (i, x.hash()).hash(), 0)
+    this.foldl((acc, x) -> Hashable.combine(acc, x.hash()), 0)
   }
 
   readonly fun hashBy(hash: T -> Int, seed: Int): Int {
-    this.foldl((i, x) -> (i, hash(x)).hash(), seed)
+    this.foldl((acc, x) -> Hashable.combine(acc, hash(x)), seed)
   }
 
   async fun genReverse<U: frozen>[T: ^U](): ^List<U> {

@@ -1,0 +1,206 @@
+module alias T = SKTest;
+
+module HashableTest;
+
+private class BoxedInt(v: Int) uses Hashable, Equality
+
+// Exercise boxed/reference Option (Option.sk) alongside FastOption (FlagOption & SentinelOption).
+// When an Option is cast to a supertype or stored in a generic Box/Option<BoxedBase>,
+// the compiler exercises both unboxed FastOption and boxed Option representations.
+private base class PolyBase uses Hashable, Equality {
+  children =
+  | PolyInt(v: Int)
+  | PolyStr(s: String)
+}
+
+private fun checkSomeHash<V: Hashable>(x: V): void {
+  opt: ?V = Some(x);
+  expected = Hashable.combine(1027410261, x.hash());
+  T.expectEq(opt.hash(), expected);
+  boxed = Box(opt);
+  T.expectEq(boxed.value.hash(), expected);
+  // Also compare against a direct Some(x) with concrete type Some<V>.
+  concreteSome = Some(x);
+  T.expectEq(concreteSome.hash(), expected);
+}
+
+@test
+fun testCombineOrderSensitivity(): void {
+  // Asymmetric on distinct small, negative, and boundary inputs.
+  vals = Array[0, 1, 2, 3, 7, 8, 10, 16, 42, -1, -2, Int::min, Int::max];
+  for (i in Range(0, vals.size())) {
+    for (j in Range(i + 1, vals.size())) {
+      a = vals[i];
+      b = vals[j];
+      T.expectNe(
+        Hashable.combine(a, b),
+        Hashable.combine(b, a),
+        `combine(${a}, ${b}) should differ from combine(${b}, ${a})`,
+      );
+    }
+  };
+}
+
+@test
+fun testCombineDeterminism(): void {
+  T.expectEq(Hashable.combine(0, 0), Hashable.combine(0, 0));
+  T.expectEq(Hashable.combine(123, 456), Hashable.combine(123, 456));
+  T.expectEq(Hashable.combine(-1, 42), Hashable.combine(-1, 42));
+}
+
+@test
+fun testCombineAvalancheSmallInts(): void {
+  // Sequential small ints combined with a fixed seed should produce distinct
+  // hashes with strong bit diffusion across all 64 bits (both low and high).
+  seen = mutable Set<Int>[];
+  prev = Hashable.combine(0, 0);
+  seen.insert(prev);
+  totalHamming = 0;
+  anyHighBitSet = false;
+  anyLowBitSet = false;
+  for (i in Range(1, 256)) {
+    h = Hashable.combine(0, i);
+    T.expectFalse(seen.contains(h), `collision at i=${i}`);
+    seen.insert(h);
+    diff = h.xor(prev);
+    d = diff.popcount();
+    T.expectTrue(
+      d >= 12,
+      `weak avalanche between ${i - 1} and ${i}: ${d} bits`,
+    );
+    !totalHamming = totalHamming + d;
+    if (h.ushr(32) != 0) !anyHighBitSet = true;
+    if (h.and(0xffffffff) != 0) !anyLowBitSet = true;
+    !prev = h;
+  };
+  // Average Hamming distance over 255 steps should be close to 32.
+  T.expectTrue(
+    totalHamming >= 255 * 24 && totalHamming <= 255 * 40,
+    `average Hamming distance out of range: ${totalHamming / 255}`,
+  );
+  T.expectTrue(anyHighBitSet);
+  T.expectTrue(anyLowBitSet);
+}
+
+@test
+fun testCombineAvalancheTuples(): void {
+  // Small integer pairs should have no collisions, order sensitivity, and
+  // spread across both upper and lower 32-bit halves.
+  seen = mutable Set<Int>[];
+  hiSet = false;
+  loSet = false;
+  for (i in Range(0, 32)) {
+    for (j in Range(0, 32)) {
+      h = (i, j).hash();
+      T.expectFalse(seen.contains(h), `tuple collision at (${i}, ${j})`);
+      seen.insert(h);
+      if (h.ushr(32) != 0) !hiSet = true;
+      if (h.and(0xffffffff) != 0) !loSet = true;
+      if (i < j) {
+        T.expectNe(
+          h,
+          (j, i).hash(),
+          `tuple hash (${i}, ${j}) should differ from (${j}, ${i})`,
+        );
+      };
+    };
+  };
+  T.expectTrue(hiSet);
+  T.expectTrue(loSet);
+
+  // Small 3-tuples also preserve order and avoid collisions.
+  seen3 = mutable Set<Int>[];
+  for (a in Range(0, 8)) {
+    for (b in Range(0, 8)) {
+      for (c in Range(0, 8)) {
+        h = (a, b, c).hash();
+        T.expectFalse(
+          seen3.contains(h),
+          `tuple3 collision at (${a}, ${b}, ${c})`,
+        );
+        seen3.insert(h);
+      };
+    };
+  };
+}
+
+@test
+fun testOptionHashNoTrivialCollisions(): void {
+  noneInt: ?Int = None();
+  T.expectEq(noneInt.hash(), 1027410261);
+
+  // Previous x.hash() + 1 collided Some(0) with 1 and Some(1027410260) with None().
+  T.expectNe(Some(0).hash(), 1.hash());
+  T.expectNe(Some(0).hash(), 0.hash());
+  T.expectNe(Some(1027410260).hash(), noneInt.hash());
+  T.expectNe(Some(1027410261).hash(), noneInt.hash());
+
+  // Bool options (FlagOption)
+  noneBool: ?Bool = None();
+  T.expectNe(Some(true).hash(), Some(false).hash());
+  T.expectNe(Some(true).hash(), noneBool.hash());
+  T.expectNe(Some(false).hash(), noneBool.hash());
+
+  // String & class options (SentinelOption)
+  noneStr: ?String = None();
+  T.expectEq(noneStr.hash(), noneInt.hash());
+  T.expectNe(Some("").hash(), noneStr.hash());
+  T.expectNe(Some("a").hash(), Some("b").hash());
+  T.expectNe(Some("a").hash(), "a".hash());
+
+  noneBox: ?BoxedInt = None();
+  T.expectEq(noneBox.hash(), noneInt.hash());
+  T.expectNe(Some(BoxedInt(0)).hash(), noneBox.hash());
+  T.expectNe(Some(BoxedInt(0)).hash(), Some(BoxedInt(1)).hash());
+}
+
+@test
+fun testOptionHashConsistentAcrossRepresentations(): void {
+  // Verify FlagOption (value type ?Int), SentinelOption (reference type ?String,
+  // ?BoxedInt), and boxed Option<?T> all match Hashable.combine(1027410261, x.hash())
+  // for Some(x) and 1027410261 for None().
+  checkSomeHash(0);
+  checkSomeHash(1);
+  checkSomeHash(1027410260);
+  checkSomeHash(-42);
+  checkSomeHash(true);
+  checkSomeHash(false);
+  checkSomeHash("");
+  checkSomeHash("hello");
+  checkSomeHash(BoxedInt(7));
+  checkSomeHash((PolyInt(7) : PolyBase));
+  checkSomeHash((PolyStr("hi") : PolyBase));
+  checkSomeHash((Some(42) : ?Int));
+  checkSomeHash((None() : ?Int));
+
+  // Nested Option<?Int> (FlagOption wrapping FlagOption)
+  noneNested: ??Int = None();
+  someNone: ??Int = Some(None());
+  someSome0: ??Int = Some(Some(0));
+  T.expectEq(noneNested.hash(), 1027410261);
+  T.expectNe(someNone.hash(), noneNested.hash());
+  T.expectNe(someSome0.hash(), someNone.hash());
+  T.expectNe(someSome0.hash(), Some(0).hash());
+
+  boxedNoneInt = Box((None() : ?Int));
+  boxedNoneStr = Box((None() : ?String));
+  T.expectEq(boxedNoneInt.value.hash(), 1027410261);
+  T.expectEq(boxedNoneStr.value.hash(), 1027410261);
+}
+
+@test
+fun testListHash(): void {
+  T.expectEq((List[] : List<Int>).hash(), 0);
+  T.expectNe(List[1, 2].hash(), List[2, 1].hash());
+  T.expectNe(List[1, 2, 3].hash(), List[1, 3, 2].hash());
+  T.expectNe(List[0].hash(), (List[] : List<Int>).hash());
+  T.expectNe(List[0, 0].hash(), List[0].hash());
+  T.expectEq(List[1, 2, 3].hash(), List[1, 2, 3].hash());
+  T.expectEq(List[1, 2, 3].hashBy(x -> x.hash(), 0), List[1, 2, 3].hash());
+  T.expectNe(
+    List[1, 2, 3].hashBy(x -> x.hash(), 7),
+    List[1, 2, 3].hashBy(x -> x.hash(), 0),
+  );
+}
+
+module end;
