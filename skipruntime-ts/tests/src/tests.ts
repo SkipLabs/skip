@@ -533,6 +533,91 @@ const jsonParamsService = {
   createGraph: (ic: Input_NN) => ic,
 };
 
+// testMutableMapperParams (#1151) - passing plain mutable arrays/objects to
+// map() and mapReduce() auto-clones and deep-freezes them so caller mutations
+// do not cause inconsistent incremental updates.
+
+type Input_SS = { input: EagerCollection<string, string> };
+
+class GroupFilterMapper implements Mapper<string, string, string, string> {
+  constructor(
+    private readonly groupIds: readonly string[],
+    private readonly config: { readonly prefix: string },
+  ) {}
+
+  mapEntry(key: string, values: Values<string>): Iterable<[string, string]> {
+    const out: [string, string][] = [];
+    for (const v of values.toArray()) {
+      if (this.groupIds.includes(v)) {
+        out.push([key, `${this.config.prefix}:${v}`]);
+      }
+    }
+    return out;
+  }
+}
+
+class TagJoinReducer implements Reducer<string, string> {
+  initial: string | null = null;
+
+  constructor(private readonly sep: { readonly value: string }) {}
+
+  add(accum: string | null, value: string): string {
+    return accum === null ? value : `${accum}${this.sep.value}${value}`;
+  }
+
+  remove(_accum: string, _value: string): string | null {
+    return null;
+  }
+}
+
+class MutableParamsResource implements Resource<Input_SS> {
+  private readonly groupIds: string[];
+  private readonly config: { prefix: string };
+
+  constructor(params: Json) {
+    const p = params as { groupIds: string[]; prefix: string };
+    // Intentionally construct fresh mutable JS array and object.
+    this.groupIds = [...p.groupIds];
+    this.config = { prefix: p.prefix };
+  }
+
+  instantiate(cs: Input_SS): EagerCollection<string, string> {
+    const mapped = cs.input.map(GroupFilterMapper, this.groupIds, this.config);
+    // Mutating the originals after map() must not affect future updates.
+    this.groupIds.push("mutated-group");
+    this.config.prefix = "mutated-prefix";
+    return mapped;
+  }
+}
+
+class MutableMapReduceParamsResource implements Resource<Input_SS> {
+  instantiate(cs: Input_SS): EagerCollection<string, string> {
+    const groupIds = ["g1", "g2"];
+    const config = { prefix: "ok" };
+    const sep = { value: "+" };
+    const reduced = cs.input.mapReduce(
+      GroupFilterMapper,
+      groupIds,
+      config,
+    )(TagJoinReducer, sep);
+    groupIds.push("g3");
+    config.prefix = "bad";
+    sep.value = "!";
+    return reduced;
+  }
+}
+
+const mutableMapperParamsService = {
+  inputs: { input: new InputDefinition<string, string>() },
+  resources: {
+    mutableMap: MutableParamsResource,
+    mutableMapReduce: MutableMapReduceParamsResource,
+  },
+  createGraph(inputs: Input_SS) {
+    return inputs;
+  },
+};
+
 // testJSONExtract
 
 class JSONExtract
@@ -1223,7 +1308,7 @@ class ValuesResource implements Resource<Input_NN_NN> {
 
   instantiate(inputs: Input_NN_NN): EagerCollection<number, number> {
     const ids = inputs.input1.getArray(this.id);
-    return inputs.input2.map(Filter, ids as any);
+    return inputs.input2.map(Filter, ids);
   }
 }
 
@@ -1764,6 +1849,49 @@ export function initTests(
       ).toEqual([
         [1, [43]],
         [2, [44]],
+      ]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testMutableMapperParams", async () => {
+    const service = await initService(mutableMapperParamsService);
+    try {
+      await service.update("input", [
+        ["a", ["g1"]],
+        ["b", ["mutated-group"]],
+      ]);
+      expect(
+        await service.getAll("mutableMap", {
+          groupIds: ["g1", "g2"],
+          prefix: "p",
+        }),
+      ).toEqual([["a", ["p:g1"]]]);
+
+      // Subsequent updates must still see the frozen snapshot, not mutated values.
+      await service.update("input", [
+        ["c", ["g2"]],
+        ["d", ["mutated-group"]],
+      ]);
+      expect(
+        await service.getAll("mutableMap", {
+          groupIds: ["g1", "g2"],
+          prefix: "p",
+        }),
+      ).toEqual([
+        ["a", ["p:g1"]],
+        ["c", ["p:g2"]],
+      ]);
+
+      // mapReduce with mutable mapper + reducer params.
+      await service.update("input", [
+        ["a", ["g1", "g2"]],
+        ["e", ["g3"]],
+      ]);
+      expect(await service.getAll("mutableMapReduce")).toEqual([
+        ["a", ["ok:g1+ok:g2"]],
+        ["c", ["ok:g2"]],
       ]);
     } finally {
       await service.close();

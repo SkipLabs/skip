@@ -46,6 +46,11 @@ export function isSkManaged(x: any): x is Managed {
   return sk_managed in x && x[sk_managed] === true;
 }
 
+export function isPlainObject(value: object): boolean {
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 export abstract class SkManaged extends Frozen {
   protected freeze() {
     tagSkManaged(this);
@@ -57,13 +62,14 @@ export abstract class SkManaged extends Frozen {
  *
  * A value can be safely used as a dependency of a reactive computation if it is:
  * 1. a primitive JavaScript value (boolean, number, string, etc.)
- * 2. managed by the Skip runtime, which will correctly track dependencies, or
- * 3. a deep-frozen and therefore constant JavaScript object.
+ * 2. managed by the Skip runtime, which will correctly track dependencies,
+ * 3. a deep-frozen and therefore constant JavaScript object (see `deepFreeze`), or
+ * 4. a plain JSON array or object (which is automatically deep-cloned and deep-frozen when passed as a `Mapper`, `Reducer`, or `LazyCompute` constructor parameter).
  *
  * Values used in reactive computations must be dependency-safe so that reactive computations can be reevaluated as needed with consistent semantics.
  *
  * All objects/values that come _out_ of the Skip runtime are dependency-safe.
- * Non-Skip objects can be made dependency-safe by passing them to `deepFreeze`, which recursively freezes their fields and returns a constant `Managed` object.
+ * Non-plain JavaScript objects (such as class instances) can be made dependency-safe by passing them to `deepFreeze`, which recursively freezes their fields and returns a constant `Managed` object.
  */
 export type DepSafe =
   | null
@@ -72,22 +78,87 @@ export type DepSafe =
   | bigint
   | string
   | symbol
-  | Managed;
+  | Managed
+  | readonly (DepSafe | Json | null)[]
+  | { readonly [key: string]: DepSafe | Json | null };
+
+function isSkManagedDeepFrozen(
+  value: unknown,
+  seen = new Set<object>(),
+): boolean {
+  if (value === null || typeof value !== "object") return true;
+  if (isObjectProxy(value)) return false;
+  if (!isSkManaged(value)) return false;
+  if (!Array.isArray(value) && !isPlainObject(value)) return true;
+  if (!Object.isFrozen(value)) return false;
+  if (seen.has(value)) return true;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.every((elt) => isSkManagedDeepFrozen(elt, seen));
+  }
+  return Object.values(value).every((val) => isSkManagedDeepFrozen(val, seen));
+}
 
 export function checkOrCloneParam<T>(value: T): T {
   if (
     typeof value == "boolean" ||
     typeof value == "number" ||
-    typeof value == "string"
+    typeof value == "bigint" ||
+    typeof value == "string" ||
+    typeof value == "symbol"
   )
     return value;
   if (typeof value == "object") {
     if (value === null) return value;
-    if (isObjectProxy(value)) return value.clone() as T;
-    if (isSkManaged(value)) return value;
-    throw new Error("Invalid object: must be deep-frozen.");
+    if (isObjectProxy(value)) return deepFreeze(value.clone()) as T;
+    if (isSkManagedDeepFrozen(value)) return value;
+    if (Array.isArray(value) || isPlainObject(value)) {
+      return deepFreeze(cloneJsonValue(value)) as T;
+    }
+    throw new Error(
+      "Invalid parameter: object parameters must be managed by Skip, deep-frozen with `deepFreeze()`, or plain JSON objects/arrays before being passed to a Mapper, Reducer, or LazyCompute.",
+    );
   }
   throw new Error(`'${typeof value}' cannot be deep-frozen.`);
+}
+
+function cloneJsonValue<T>(value: T, seen = new Set<object>()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (isObjectProxy(value)) {
+    return value.clone() as T;
+  }
+  if (isSkManagedDeepFrozen(value)) {
+    return value;
+  }
+  if (seen.has(value)) {
+    throw new Error(
+      "Invalid parameter: circular object/array references cannot be passed to a Mapper, Reducer, or LazyCompute.",
+    );
+  }
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return (value as unknown[]).map((elt) => cloneJsonValue(elt, seen)) as T;
+    }
+    if (isPlainObject(value)) {
+      const copy = Object.create(
+        Object.getPrototypeOf(value) as object | null,
+      ) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(value)) {
+        if (v !== undefined) {
+          copy[k] = cloneJsonValue(v, seen);
+        }
+      }
+      return copy as T;
+    }
+    throw new Error(
+      "Invalid parameter: nested non-plain objects must be managed by Skip or deep-frozen with `deepFreeze()` before being passed to a Mapper, Reducer, or LazyCompute.",
+    );
+  } finally {
+    seen.delete(value);
+  }
 }
 
 /**
@@ -296,7 +367,7 @@ function interpretPointer<T extends Internal.CJSON>(
       const array = Array.from({ length }, (_, idx) =>
         interpretPointer(binding, binding.SKIP_SKJSON_at(aPtr, idx)),
       );
-      return tagSkManaged(array);
+      return Object.freeze(tagSkManaged(array));
     }
     case Type.Object: {
       const oPtr = binding.SKIP_SKJSON_asObject(pointer);

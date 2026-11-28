@@ -221,7 +221,9 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * @remarks
    * The reason `map` accepts the `Mapper` class constructor and `params` separately and instantiates the class internally is to avoid the resulting `mapEntry` functions from being able to access other objects that the Skip Runtime is not aware of, and hence cannot track updates to.
-   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant or tracked by the Skip Runtime.
+   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant, plain JSON values (which are automatically deep-cloned and deep-frozen when captured), or tracked by the Skip Runtime.
+   * Mutating an object or array after passing it as a parameter will have no effect on the mapper.
+   * For non-plain objects (such as class instances), call {@link deepFreeze} before passing them.
    * It is a **bad idea** to attempt to circumvent the spirit of the constraints this interface imposes.
    *
    * @typeParam K2 - Type of keys of the new collection.
@@ -251,7 +253,9 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * @remarks
    * The reason `reduce` accepts the `Reducer` class constructor and `params` separately and instantiates the class internally is to avoid the resulting `add` and `remove` functions from being able to access other objects that the Skip Runtime is not aware of, and hence cannot track updates to.
-   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant values or tracked by the Skip Runtime.
+   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant values, plain JSON values (which are automatically deep-cloned and deep-frozen when captured), or tracked by the Skip Runtime.
+   * Mutating an object or array after passing it as a parameter will have no effect on the reducer.
+   * For non-plain objects (such as class instances), call {@link deepFreeze} before passing them.
    * It is a **bad idea** to attempt to circumvent the spirit of the constraints this interface imposes.
    *
    * @typeParam Accum - Type of accumulated values.

@@ -16,6 +16,17 @@ Non-determinism can produce unexpected behavior in a reactive environment, since
 The main invariant that the Skip runtime guarantees is _from-scratch consistency_ (i.e. reactive outputs are precisely the same as if the full computation were reexecuted from scratch, without any caching or reuse) which is weakened by non-determinisism.
 Although non-determinism is not necessarily a bug in the strictest sense, it can make reactive systems difficult to reason about and should be used only with careful consideration.
 
+## Constructor parameters
+
+Mappers, reducers, and lazy computations can accept extra constructor parameters passed via `collection.map(MyMapper, ...params)`, `collection.reduce(MyReducer, ...params)`, `collection.mapReduce(MyMapper, ...mapperParams)(MyReducer, ...reducerParams)`, or `context.createLazyCollection(MyCompute, ...params)`.
+
+Because the Skip runtime caches and re-evaluates these functions incrementally, their parameters must be _dependency-safe_ (`DepSafe`):
+
+- **Reactive collections** (`EagerCollection`, `LazyCollection`) are tracked directly by the runtime.
+- **Primitive values** (`boolean`, `number`, `string`, `null`, etc.) are immutable by definition.
+- **Plain JSON arrays and objects** (e.g. `["group-1", "group-2"]` or `{ role: "admin" }`) are automatically deep-cloned and deep-frozen when captured, so later mutations to the caller's copy cannot cause inconsistent results.
+- **Custom class instances** or other non-plain objects must be deep-frozen with `deepFreeze()` before being passed as parameters (otherwise the runtime throws an error at construction time).
+
 ## Examples
 
 Mappers must implement the Skip `Mapper` interface and define a `mapEntry` function which takes a key and corresponding values from an input collection and produces some key/value pairs defining an output collection.
