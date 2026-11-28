@@ -1,11 +1,13 @@
 /**
- * Module-private brand keys for the type-erased abstract bases in `api.ts`
- * (`AbstractEagerCollection`, `AbstractLazyCollection`, `AbstractInputDefinition`).
+ * Module-private nominal brand symbols for the type-erased abstract bases in
+ * `api.ts` (`AbstractEagerCollection`, `AbstractLazyCollection`,
+ * `AbstractInputDefinition`).
  *
- * These are type-level only (`declare`, never defined at runtime) and this module
- * is not listed in the package's `exports`, so code outside `@skipruntime/core`
- * cannot name the keys to forge a structurally matching value: object literals
- * and other look-alikes are rejected, making the bases nominal.
+ * This module is not listed in the package's `exports`, so code outside
+ * `@skipruntime/core` cannot name the symbols to forge a structurally matching
+ * object or invoke the sealed `protected constructor(_seal: typeof ...)` on a
+ * subclass. The symbols are real runtime `Symbol` values stored on runtime
+ * instances (no phantom `never`-typed fields).
  *
  * Intentionally NOT tagged `@internal`: `api.ts` references these symbols in
  * public abstract classes, so `stripInternal` would strip their declarations
@@ -14,6 +16,10 @@
  * @packageDocumentation
  */
 
-export declare const eagerCollectionBrand: unique symbol;
-export declare const lazyCollectionBrand: unique symbol;
-export declare const inputDefinitionBrand: unique symbol;
+export const eagerCollectionBrand: unique symbol = Symbol(
+  "Skip.eagerCollection",
+);
+export const lazyCollectionBrand: unique symbol = Symbol("Skip.lazyCollection");
+export const inputDefinitionBrand: unique symbol = Symbol(
+  "Skip.inputDefinition",
+);

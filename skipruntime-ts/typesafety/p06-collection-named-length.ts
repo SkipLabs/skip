@@ -1,4 +1,5 @@
 import {
+  type Context,
   type EagerCollection,
   type Resource,
   InputDefinition,
@@ -18,11 +19,11 @@ class LengthResource implements Resource<ResourceInputs> {
 
 // A collection legitimately named `length` must be accepted in both `InputDefs`
 // and `ResourceInputs`: `AllInputDefs` / `AllSharedCollections` reject arrays
-// via `[Symbol.iterator]?: never` rather than `length?: never`.
+// via `keyof T & string` rather than `length?: never` or `[Symbol.iterator]?: never`.
 const service = {
   inputs: { length: new InputDefinition<string, number>([["a", [1]]]) },
   resources: { length: LengthResource },
-  createGraph: (ic: ResourceInputs): ResourceInputs => ic,
+  createGraph: (ic: ResourceInputs, _ctx: Context): ResourceInputs => ic,
 };
 
 export function start(): Promise<SkipServer> {

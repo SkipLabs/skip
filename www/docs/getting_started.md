@@ -120,7 +120,6 @@ In this example, we pull initial user and group data from an external source-of-
 ```typescript
 import {
   type EagerCollection,
-  type InputCollections,
   type Mapper,
   type Values,
   InputDefinition,
@@ -132,8 +131,11 @@ const inputs = {
   groups: new InputDefinition<GroupID, Group>(),
 };
 
-// Derived collection types passed to `createGraph` (mirrors `inputs`)
-type ServiceInputs = InputCollections<typeof inputs>;
+// Type alias for inputs to our service (matches `InputCollections` of `inputs`)
+type ServiceInputs = {
+  readonly users: EagerCollection<UserID, User>;
+  readonly groups: EagerCollection<GroupID, Group>;
+};
 
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
@@ -166,7 +168,7 @@ const service = {
 await runService(service);
 ```
 
-This example service operates over two _input collections_ (one for users and one for groups, derived from `inputs` via `InputCollections<typeof inputs>`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
+This example service operates over two _input collections_ (one for users and one for groups, matching `inputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
 This `activeMembers` collection is the "output" of the shared computation graph, produced by mapping over the input groups and taking users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
 
 Our service wants to expose a resource -- parameterized by a user ID -- which can be queried or subscribed to by clients to view that user's active friends in each group.
