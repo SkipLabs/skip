@@ -8,6 +8,7 @@ export {
   defaultParamEncoder,
   PolledExternalService,
   type PolledHTTPResource,
+  type PollingInterval,
 } from "./external.js";
 export { SkipExternalService, asLeader, asFollower } from "./remote.js";
 export { SkipServiceBroker, fetchJSON, type Entrypoint } from "./rest.js";
