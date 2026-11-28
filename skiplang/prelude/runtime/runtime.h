@@ -122,9 +122,13 @@ typedef struct {
 
 typedef struct {
   size_t head;
-  size_t capacity;
+  size_t capacity : sizeof(size_t) * 8 - 1;
+  size_t is_inline : 1;
   sk_value_t* values;
 } sk_stack_t;
+
+_Static_assert(sizeof(sk_stack_t) == 3 * sizeof(size_t),
+               "sk_stack_t should stay 3 words");
 
 void sk_stack_init(sk_stack_t* st, size_t capacity);
 void sk_stack_init_inline(sk_stack_t* st, sk_value_t* buf, size_t capacity);
