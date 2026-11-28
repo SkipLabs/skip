@@ -16,7 +16,7 @@ Monorepo for the **Skip** reactive framework (`skipruntime-ts/`), the **Skiplang
 | `skiplang/prelude/` | `std` library (`src/core/`, `src/stdlib/`, `src/skstore/`), C/Wasm runtime (`runtime/`), TS bindings (`ts/`) |
 | `skiplang/skargo/` | `skargo` build/test driver (`src/`, `tests/`) |
 | `skiplang/{arparser,cc,cli,pkg-config,semver,skbigint,skdate,skjson,sktest,sqlparser,toml}/` | Supporting Skiplang packages |
-| `skiplang/docs/` | Agent-oriented Skiplang references: [language.md](skiplang/docs/language.md), [stdlib.md](skiplang/docs/stdlib.md), [tooling-and-ffi.md](skiplang/docs/tooling-and-ffi.md), [SKStore.md](skiplang/docs/SKStore.md), [modifiers-and-annotations.md](skiplang/docs/modifiers-and-annotations.md), plus compiler internals |
+| `skiplang/docs/` | Agent-oriented Skiplang references: [language.md](skiplang/docs/language.md), [stdlib.md](skiplang/docs/stdlib.md), [tooling-and-ffi.md](skiplang/docs/tooling-and-ffi.md), [SKStore.md](skiplang/docs/SKStore.md), [modifiers-and-annotations.md](skiplang/docs/modifiers-and-annotations.md), [patterns.md](skiplang/docs/patterns.md), plus compiler internals |
 | `skipruntime-ts/` | `@skipruntime/*`, `@skip-adapter/*`, `@skiplabs/skip` workspaces + `skiplang/{core,ffi}/` |
 | `sql/` | SKDB native/Wasm engine (`src/`), TS client (`ts/`), Java server (`server/`), SQL tests |
 | `examples/` | End-to-end Docker apps (`hackernews`, `chatroom`, `blogger`, `cache_invalidation`) |

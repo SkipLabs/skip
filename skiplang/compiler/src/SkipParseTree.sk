@@ -3499,6 +3499,31 @@ class ParenExpressionTree{
   }
 }
 
+class OrPatternTree{patterns: ParseTree.ParseTree} extends ParseTree.ParseTree {
+  fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
+    List<(String, ParseTree.ParseTree)>[("patterns", this.patterns)];
+  }
+
+  fun getKind(): String {
+    "OrPattern";
+  }
+
+  fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.patterns;
+    yield break;
+  }
+
+  fun transform(
+    codemod: mutable CodeMod,
+  ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_patterns = codemod.transform(this.patterns);
+    (
+      OrPatternTree{range => this.range, patterns => tx_patterns.i0},
+      tx_patterns.i1,
+    );
+  }
+}
+
 class ParenPatternTree{
   openParen: ParseTree.ParseTree,
   pattern: ParseTree.ParseTree,

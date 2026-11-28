@@ -451,6 +451,17 @@ fun pattern_bindings(acc: UMap<void>, pat: A.Pattern): UMap<void> {
   | A.Pat_as(pattern, name) ->
     acc1 = bind_pattern_name(acc, name);
     pattern_bindings(acc1, pattern)
+  | A.Pat_or(pats) ->
+    invariant(!pats.isEmpty(), "ICE empty or-pattern");
+    // Each alternative must not duplicate any outer binding, and all
+    // alternatives must bind the same set of variables (verified in
+    // check_locals_pattern). Check every alternative against `acc`, then
+    // return the first alternative's accumulated bindings.
+    res = pattern_bindings(acc, pats[0]);
+    for (i in Range(1, pats.size())) {
+      _ = pattern_bindings(acc, pats[i])
+    };
+    res
   }
 }
 
@@ -909,15 +920,11 @@ fun check_locals_match_branches(
   (f, changed, mbl)
 }
 
-fun check_locals_match_branch(
+fun check_or_pattern_locals(
   bound: Bound,
-  mb: N.Match_branch,
-): (Free, Bool, N.Match_branch) {
-  (pats, maybe_guard, e) = mb;
-  (pathd, pattl) = pats match {
-  | List.Nil() -> invariant_violation("empty match branch")
-  | List.Cons(x, xs) -> (x, xs)
-  };
+  pathd: N.Pattern,
+  pattl: Sequence<N.Pattern>,
+): (Bound, Bound) {
   patbound = check_locals_pattern(empty_bound, pathd);
   !bound = patbound.m.reduce((b, var, fr) -> b.bind((fr, var)), bound);
   check_local_set = (srcpat, m, v, p) ->
@@ -937,6 +944,19 @@ fun check_locals_match_branch(
     }
   };
   pattl.each(check_pattern);
+  (bound, patbound)
+}
+
+fun check_locals_match_branch(
+  bound: Bound,
+  mb: N.Match_branch,
+): (Free, Bool, N.Match_branch) {
+  (pats, maybe_guard, e) = mb;
+  (pathd, pattl) = pats match {
+  | List.Nil() -> invariant_violation("empty match branch")
+  | List.Cons(x, xs) -> (x, xs)
+  };
+  (!bound, patbound) = check_or_pattern_locals(bound, pathd, pattl);
   (f1, c1, !maybe_guard) = maybe_guard match {
   | None() -> (empty_free, false, None())
   | Some(mg) ->
@@ -964,6 +984,10 @@ fun check_locals_pattern(bound: Bound, pat: N.Pattern): Bound {
   | N.Pat_as(p, var_name) ->
     !bound = if (is_wildcard_name(var_name)) bound else bound.bind(var_name);
     check_locals_pattern(bound, p)
+  | N.Pat_or(pats) ->
+    invariant(!pats.isEmpty(), "ICE empty or-pattern");
+    (bound1, _) = check_or_pattern_locals(bound, pats[0], pats.slice(1));
+    bound1
   }
 }
 
@@ -4625,6 +4649,8 @@ fun translate_pattern(
     (pos, N.tuple_pattern(context, pos, npats))
   | (pos, A.Pat_as(p, n)) ->
     (pos, N.Pat_as(translate_pattern(context, acc, env, p), n))
+  | (pos, A.Pat_or(pats)) ->
+    (pos, N.Pat_or(pats.map(p -> translate_pattern(context, acc, env, p))))
   }
 }
 

@@ -4527,6 +4527,33 @@ fun pattern_(
     (final_ty, _, _) = var;
     pat_as = (pos, TAst.Pat_as(pat1, var));
     ((env2, acc2), (final_ty, pat_as))
+  | N.Pat_or(pats) ->
+    invariant(!pats.isEmpty(), "ICE empty or-pattern");
+    ((env1, acc1), pats1) = pats.mapAcc(
+      (env_acc, pat) -> {
+        (e, a) = env_acc;
+        pattern(context, next_id, e, a, pat_level, einfo, pat)
+      },
+      (env, acc),
+    );
+    (acc2, joined_ty) = pats1.foldl(
+      (acc_ty, pat) -> {
+        (a, ty) = acc_ty;
+        pat_ty = TAstUtils.get_type_of_pattern(pat);
+        TUtils.join(
+          context,
+          next_id,
+          env1,
+          pos,
+          "Invalid or-pattern",
+          a,
+          ty,
+          pat_ty,
+        )
+      },
+      (acc1, ((pos, N.Tanything()) : N.Type_)),
+    );
+    ((env1, acc2), (joined_ty, (pos, TAst.Pat_or(pats1))))
   }
 }
 
@@ -4792,6 +4819,9 @@ fun check_pattern(
   | (TUtils.InitPat _, _) -> void
   | (_, N.Pat_var(n))
   | (_, N.Pat_as(_, n)) if (SkipNaming.is_wildcard_name(n)) ->
+    void
+  | (_, N.Pat_or _) ->
+    // Each alternative is checked individually when typing Pat_or.
     void
   | (np @ TUtils.NestedPat _, _) ->
     msg = () ~> inaccessible_field_in_pattern_message(np.name.i1);

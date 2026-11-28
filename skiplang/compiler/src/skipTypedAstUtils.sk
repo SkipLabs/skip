@@ -74,6 +74,7 @@ fun pattern_is_exhaustive(pat: T.Pattern): Bool {
   /* TODO: should do a type test here */
   | T.Pat_type _ -> false
   | T.Pat_as(pat1, _) -> pattern_is_exhaustive(pat1)
+  | T.Pat_or(pats) -> pats.any(pattern_is_exhaustive)
   }
 }
 
@@ -469,6 +470,7 @@ mutable class Visitor<State>{
         params.map(x -> x.map(this.visitParamPattern)),
       )
     | Pat_as(p, b) -> Pat_as(this.visitPattern(p), this.visitBinding(b))
+    | Pat_or(pats) -> Pat_or(pats.map(this.visitPattern))
     }
   }
 

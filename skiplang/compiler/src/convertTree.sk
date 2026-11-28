@@ -506,6 +506,8 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
     | ParseTree.TuplePatternTree{elements} ->
       SkipAst.Pat_tuple(elements.getList().map(this.convertPattern))
     | ParseTree.ParenPatternTree{pattern} -> this.convertPattern_(pattern)
+    | ParseTree.OrPatternTree{patterns} ->
+      SkipAst.Pat_or(patterns.getList().map(this.convertPattern))
     | ParseTree.ConstPatternTree{value} ->
       SkipAst.Pat_const(this.convertExpression(value))
     | ParseTree.ClassPatternTree{typeName, arguments} ->

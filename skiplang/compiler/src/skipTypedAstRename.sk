@@ -368,6 +368,12 @@ fun pl_pattern__(
     (names1, convertedBinding) = convert_binding(binding);
     (names2, pat1) = pl_pattern(env, next_id, names1, pat);
     (names2, T.Pat_as(pat1, convertedBinding))
+  | T.Pat_or(pats) ->
+    (names1, pats1) = pats.mapAcc(
+      (p1, p2) -> pl_pattern(env, next_id, p1, p2),
+      (names, seen),
+    );
+    (names1, T.Pat_or(pats1))
   }
 }
 
@@ -587,6 +593,7 @@ fun sbr_pattern(env: mutable LocalsInfo, pat: T.Pattern): T.Pattern {
       )
     | T.Pat_as(pat1, var) ->
       T.Pat_as(sbr_pattern(env, pat1), sbr_binding(env, var))
+    | T.Pat_or(pats) -> T.Pat_or(pats.map(pat1 -> sbr_pattern(env, pat1)))
     }
   };
   (ty, (pos, p1))
