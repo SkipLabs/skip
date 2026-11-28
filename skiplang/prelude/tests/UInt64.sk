@@ -1,0 +1,462 @@
+module alias T = SKTest;
+
+module UInt64Test;
+
+private fun checkEquality<V: Equality>(a: V, b: V): Bool {
+  a == b
+}
+
+private fun checkCompare<V: Orderable>(a: V, b: V): Order {
+  a.compare(b)
+}
+
+private fun checkHash<V: Hashable>(a: V): Int {
+  a.hash()
+}
+
+private fun checkShow<V: readonly Show>(a: V): String {
+  a.toString()
+}
+
+private fun checkXXHash<V: XXHashable>(a: V): XXHash {
+  a.xxhash()
+}
+
+@test
+fun testConstantsAndConstruction(): void {
+  T.expectEq(UInt64::zero.toInt(), 0);
+  T.expectEq(UInt64::one.toInt(), 1);
+  T.expectEq(UInt64::min.toInt(), 0);
+  T.expectEq(UInt64::max.toInt(), -1);
+  T.expectEq(UInt64::min, UInt64::zero);
+  T.expectEq(UInt64::fromInt(0), UInt64::zero);
+  T.expectEq(UInt64::fromInt(1), UInt64::one);
+  T.expectEq(UInt64::fromInt(-1), UInt64::max);
+  T.expectEq(UInt64::fromInt(Int::min).toInt(), Int::min);
+  T.expectEq(UInt64::fromInt(Int::max).toInt(), Int::max);
+  T.expectEq(UInt64::truncate(-1), UInt64::max);
+  T.expectEq(UInt64::truncate(42).toInt(), 42);
+
+  T.expectEq(UInt64::create(0), UInt64::zero);
+  T.expectEq(UInt64::create(Int::max), UInt64::fromInt(Int::max));
+  T.expectThrow(() -> {
+    _ = UInt64::create(-1)
+  });
+  T.expectThrow(() -> {
+    _ = UInt64::create(Int::min)
+  });
+}
+
+@test
+fun testFromString(): void {
+  T.expectEq(UInt64::fromStringOption("0"), Some(UInt64::zero));
+  T.expectEq(UInt64::fromStringOption("1"), Some(UInt64::one));
+  T.expectEq(UInt64::fromStringOption("00042"), Some(UInt64::fromInt(42)));
+  T.expectEq(
+    UInt64::fromStringOption("9223372036854775807"),
+    Some(UInt64::fromInt(Int::max)),
+  );
+  T.expectEq(
+    UInt64::fromStringOption("9223372036854775808"),
+    Some(UInt64::fromInt(Int::min)),
+  );
+  T.expectEq(
+    UInt64::fromStringOption("18446744073709551614"),
+    Some(UInt64::fromInt(-2)),
+  );
+  T.expectEq(
+    UInt64::fromStringOption("18446744073709551615"),
+    Some(UInt64::max),
+  );
+
+  // Overflow cases
+  T.expectEq(UInt64::fromStringOption("18446744073709551616"), None());
+  T.expectEq(UInt64::fromStringOption("18446744073709551619"), None());
+  T.expectEq(UInt64::fromStringOption("18446744073709551620"), None());
+  T.expectEq(UInt64::fromStringOption("99999999999999999999"), None());
+  T.expectEq(UInt64::fromStringOption("184467440737095516150"), None());
+
+  // Invalid inputs
+  T.expectEq(UInt64::fromStringOption(""), None());
+  T.expectEq(UInt64::fromStringOption("-0"), None());
+  T.expectEq(UInt64::fromStringOption("-1"), None());
+  T.expectEq(UInt64::fromStringOption("+1"), None());
+  T.expectEq(UInt64::fromStringOption(" 1"), None());
+  T.expectEq(UInt64::fromStringOption("1 "), None());
+  T.expectEq(UInt64::fromStringOption("12a3"), None());
+  T.expectEq(UInt64::fromStringOption("abc"), None());
+
+  // fromString success and failure
+  T.expectEq(UInt64::fromString("0"), UInt64::zero);
+  T.expectEq(
+    UInt64::fromString("9223372036854775808"),
+    UInt64::fromInt(Int::min),
+  );
+  T.expectEq(UInt64::fromString("18446744073709551615"), UInt64::max);
+  T.expectThrow(() -> {
+    _ = UInt64::fromString("")
+  });
+  T.expectThrow(() -> {
+    _ = UInt64::fromString("-1")
+  });
+  T.expectThrow(() -> {
+    _ = UInt64::fromString("18446744073709551616")
+  });
+}
+
+@test
+fun testOrderingAndEquality(): void {
+  ordered = Array[
+    UInt64::zero,
+    UInt64::one,
+    UInt64::fromInt(42),
+    UInt64::fromInt(Int::max - 1),
+    UInt64::fromInt(Int::max),
+    UInt64::fromInt(Int::min), // 2^63
+    UInt64::fromInt(Int::min + 1), // 2^63 + 1
+    UInt64::fromInt(-2), // 2^64 - 2
+    UInt64::max, // 2^64 - 1
+  ];
+
+  for (i in Range(0, ordered.size())) {
+    a = ordered[i];
+    T.expectTrue(a == a);
+    T.expectFalse(a != a);
+    T.expectTrue(a <= a);
+    T.expectTrue(a >= a);
+    T.expectFalse(a < a);
+    T.expectFalse(a > a);
+    T.expectEq(a.compare(a), EQ());
+    T.expectTrue(checkEquality(a, a));
+    T.expectEq(checkCompare(a, a), EQ());
+
+    for (j in Range(i + 1, ordered.size())) {
+      b = ordered[j];
+      T.expectTrue(a < b);
+      T.expectTrue(a <= b);
+      T.expectTrue(b > a);
+      T.expectTrue(b >= a);
+      T.expectFalse(a > b);
+      T.expectFalse(a >= b);
+      T.expectFalse(b < a);
+      T.expectFalse(b <= a);
+      T.expectTrue(a != b);
+      T.expectFalse(a == b);
+      T.expectEq(a.compare(b), LT());
+      T.expectEq(b.compare(a), GT());
+      T.expectFalse(checkEquality(a, b));
+      T.expectEq(checkCompare(a, b), LT());
+      T.expectEq(checkCompare(b, a), GT());
+    }
+  };
+
+  // SortedMap uses Orderable
+  m = SortedMap::createFromItems(
+    Array[
+      (UInt64::max, "max"),
+      (UInt64::fromInt(Int::min), "2^63"),
+      (UInt64::fromInt(Int::max), "2^63-1"),
+      (UInt64::zero, "0"),
+    ],
+  );
+  T.expectEq(
+    m.keys().collect(Array),
+    Array[
+      UInt64::zero,
+      UInt64::fromInt(Int::max),
+      UInt64::fromInt(Int::min),
+      UInt64::max,
+    ],
+  );
+}
+
+@test
+fun testAddSubMulWrapping(): void {
+  half = UInt64::fromInt(Int::min); // 2^63
+  intMax = UInt64::fromInt(Int::max); // 2^63 - 1
+
+  // Crossing 2^63
+  T.expectEq(intMax + UInt64::one, half);
+  T.expectEq(half - UInt64::one, intMax);
+
+  // Wrapping across 2^64
+  T.expectEq(UInt64::max + UInt64::one, UInt64::zero);
+  T.expectEq(UInt64::max + UInt64::fromInt(10), UInt64::fromInt(9));
+  T.expectEq(UInt64::zero - UInt64::one, UInt64::max);
+  T.expectEq(UInt64::fromInt(5) - UInt64::fromInt(10), UInt64::fromInt(-5));
+  T.expectEq(half + half, UInt64::zero);
+
+  // Multiplication across 2^63 and wrapping mod 2^64
+  T.expectEq(UInt64::fromInt(2) * half, UInt64::zero);
+  T.expectEq(UInt64::fromInt(3) * half, half);
+  T.expectEq(UInt64::max * UInt64::max, UInt64::one);
+  T.expectEq(
+    UInt64::fromInt(0x100000000) * UInt64::fromInt(0x100000000),
+    UInt64::zero,
+  );
+  T.expectEq(
+    UInt64::fromInt(0xFFFFFFFF) * UInt64::fromInt(0xFFFFFFFF),
+    UInt64::fromString("18446744065119617025"),
+  );
+}
+
+@test
+fun testUnsignedDivAndRem(): void {
+  // Division by zero throws DivisionByZeroException
+  for (n in Array[
+    UInt64::zero,
+    UInt64::one,
+    UInt64::fromInt(Int::min),
+    UInt64::max,
+  ]) {
+    divCaught = try {
+      _ = n / UInt64::zero;
+      false
+    } catch {
+    | DivisionByZeroException _ -> true
+    | exn -> throw exn
+    };
+    T.expectTrue(divCaught);
+
+    remCaught = try {
+      _ = n % UInt64::zero;
+      false
+    } catch {
+    | DivisionByZeroException _ -> true
+    | exn -> throw exn
+    };
+    T.expectTrue(remCaught);
+  };
+
+  // Exact known values across sign boundary
+  max = UInt64::max;
+  half = UInt64::fromInt(Int::min); // 2^63 = 9223372036854775808
+  intMax = UInt64::fromInt(Int::max); // 2^63 - 1 = 9223372036854775807
+
+  T.expectEq(max / UInt64::one, max);
+  T.expectEq(max % UInt64::one, UInt64::zero);
+
+  T.expectEq(max / UInt64::fromInt(2), intMax);
+  T.expectEq(max % UInt64::fromInt(2), UInt64::one);
+
+  T.expectEq(
+    max / UInt64::fromInt(3),
+    UInt64::fromString("6148914691236517205"),
+  );
+  T.expectEq(max % UInt64::fromInt(3), UInt64::zero);
+
+  T.expectEq(
+    max / UInt64::fromInt(10),
+    UInt64::fromString("1844674407370955161"),
+  );
+  T.expectEq(max % UInt64::fromInt(10), UInt64::fromInt(5));
+
+  T.expectEq(max / intMax, UInt64::fromInt(2));
+  T.expectEq(max % intMax, UInt64::one);
+
+  T.expectEq(max / half, UInt64::one);
+  T.expectEq(max % half, intMax);
+
+  T.expectEq(max / (half + UInt64::one), UInt64::one);
+  T.expectEq(max % (half + UInt64::one), intMax - UInt64::one);
+
+  T.expectEq(max / max, UInt64::one);
+  T.expectEq(max % max, UInt64::zero);
+
+  T.expectEq(half / UInt64::fromInt(2), UInt64::fromInt(1.shl(62)));
+  T.expectEq(half % UInt64::fromInt(2), UInt64::zero);
+  T.expectEq(half / intMax, UInt64::one);
+  T.expectEq(half % intMax, UInt64::one);
+  T.expectEq(half / half, UInt64::one);
+  T.expectEq(half % half, UInt64::zero);
+  T.expectEq(half / (half + UInt64::one), UInt64::zero);
+  T.expectEq(half % (half + UInt64::one), half);
+
+  // Exhaustive Euclidean invariant check across boundary grid:
+  // For all n, d (d != 0): q = n / d, r = n % d => r < d and q * d + r == n
+  // and (q + 1) * d would exceed n (checked via n - q * d == r < d).
+  vals = Array[
+    UInt64::zero,
+    UInt64::one,
+    UInt64::fromInt(2),
+    UInt64::fromInt(3),
+    UInt64::fromInt(5),
+    UInt64::fromInt(7),
+    UInt64::fromInt(10),
+    UInt64::fromInt(63),
+    UInt64::fromInt(64),
+    UInt64::fromInt(0xFFFF),
+    UInt64::fromInt(0x10000),
+    UInt64::fromInt(0xFFFFFFFF),
+    UInt64::fromInt(0x100000000),
+    UInt64::fromInt(0x100000001),
+    UInt64::fromInt(1.shl(62) - 1),
+    UInt64::fromInt(1.shl(62)),
+    UInt64::fromInt(1.shl(62) + 1),
+    intMax - UInt64::one,
+    intMax,
+    half,
+    half + UInt64::one,
+    half + UInt64::fromInt(2),
+    UInt64::fromInt(-100),
+    UInt64::fromInt(-3),
+    UInt64::fromInt(-2),
+    max,
+  ];
+
+  for (n in vals) {
+    for (d in vals) {
+      if (d == UInt64::zero) continue;
+      q = n / d;
+      r = n % d;
+      T.expectTrue(r < d);
+      T.expectEq(q * d + r, n);
+      // Verify q * d did not overflow 64 bits: when q > 0, (n - r) >= q and >= d.
+      if (q == UInt64::zero) {
+        T.expectTrue(n < d);
+        T.expectEq(r, n);
+      } else {
+        T.expectTrue(n >= d);
+        T.expectTrue(n >= q);
+      };
+      // Check adjacent values d-1, d, d+1 if relevant
+      if (n == d) {
+        T.expectEq(q, UInt64::one);
+        T.expectEq(r, UInt64::zero);
+      } else if (n < d) {
+        T.expectEq(q, UInt64::zero);
+        T.expectEq(r, n);
+      }
+    }
+  }
+}
+
+@test
+fun testBitwiseAndBitCounting(): void {
+  a = UInt64::fromInt(0xF0F0F0F0F0F0F0F0);
+  b = UInt64::fromInt(0x0FF00FF00FF00FF0);
+
+  T.expectEq(a.and(b), UInt64::fromInt(0x00F000F000F000F0));
+  T.expectEq(a.or(b), UInt64::fromInt(0xFFF0FFF0FFF0FFF0));
+  T.expectEq(a.xor(b), UInt64::fromInt(0xFF00FF00FF00FF00));
+  T.expectEq(UInt64::zero.not(), UInt64::max);
+  T.expectEq(UInt64::max.not(), UInt64::zero);
+  T.expectEq(a.not(), UInt64::fromInt(0x0F0F0F0F0F0F0F0F));
+
+  // Shifts: shr MUST zero-fill high bits (logical right shift)
+  T.expectEq(UInt64::max.shr(1), UInt64::fromInt(Int::max));
+  T.expectEq(UInt64::max.ushr(1), UInt64::fromInt(Int::max));
+  T.expectEq(UInt64::fromInt(Int::min).shr(63), UInt64::one);
+  T.expectEq(UInt64::fromInt(Int::min).ushr(63), UInt64::one);
+  T.expectEq(UInt64::max.shr(63), UInt64::one);
+  T.expectEq(UInt64::one.shl(63), UInt64::fromInt(Int::min));
+  T.expectEq(UInt64::one.shl(0), UInt64::one);
+  T.expectEq(UInt64::max.shr(0), UInt64::max);
+  // Accepts other Integral shift counts
+  T.expectEq(UInt64::one.shl(UInt8::create(8)), UInt64::fromInt(256));
+  T.expectEq(UInt64::fromInt(256).shr(UInt32::create(8)), UInt64::one);
+
+  // Bit-counting
+  T.expectEq(UInt64::zero.clz(), 64);
+  T.expectEq(UInt64::zero.ctz(), 64);
+  T.expectEq(UInt64::zero.popcount(), 0);
+
+  T.expectEq(UInt64::one.clz(), 63);
+  T.expectEq(UInt64::one.ctz(), 0);
+  T.expectEq(UInt64::one.popcount(), 1);
+
+  T.expectEq(UInt64::fromInt(Int::min).clz(), 0);
+  T.expectEq(UInt64::fromInt(Int::min).ctz(), 63);
+  T.expectEq(UInt64::fromInt(Int::min).popcount(), 1);
+
+  T.expectEq(UInt64::max.clz(), 0);
+  T.expectEq(UInt64::max.ctz(), 0);
+  T.expectEq(UInt64::max.popcount(), 64);
+
+  T.expectEq(a.popcount(), 32);
+}
+
+@test
+fun testFormattingInspectAndHashing(): void {
+  T.expectEq(UInt64::zero.toString(), "0");
+  T.expectEq(UInt64::one.toString(), "1");
+  T.expectEq(UInt64::fromInt(Int::max).toString(), "9223372036854775807");
+  T.expectEq(UInt64::fromInt(Int::min).toString(), "9223372036854775808");
+  T.expectEq(UInt64::fromInt(Int::min + 1).toString(), "9223372036854775809");
+  T.expectEq(UInt64::fromInt(-10).toString(), "18446744073709551606");
+  T.expectEq(UInt64::fromInt(-2).toString(), "18446744073709551614");
+  T.expectEq(UInt64::max.toString(), "18446744073709551615");
+
+  // Round-trip toString <-> fromString
+  for (v in Array[
+    UInt64::zero,
+    UInt64::one,
+    UInt64::fromInt(10),
+    UInt64::fromInt(Int::max),
+    UInt64::fromInt(Int::min),
+    UInt64::fromInt(-2),
+    UInt64::max,
+  ]) {
+    T.expectEq(UInt64::fromString(v.toString()), v);
+    T.expectEq(checkShow(v), v.toString());
+    T.expectEq(`${v}`, v.toString());
+    T.expectEq(inspect(v).hash(), InspectLiteral(v.toString()).hash());
+    T.expectTrue(inspect(v) is InspectLiteral _);
+  };
+
+  // Hex and binary formatting
+  T.expectEq(UInt64::zero.toStringHex(), "0000000000000000");
+  T.expectEq(UInt64::max.toStringHex(), "ffffffffffffffff");
+  T.expectEq(UInt64::fromInt(Int::min).toStringHex(), "8000000000000000");
+  T.expectEq(
+    UInt64::zero.toStringBinary(),
+    "0000000000000000000000000000000000000000000000000000000000000000",
+  );
+  T.expectEq(
+    UInt64::max.toStringBinary(),
+    "1111111111111111111111111111111111111111111111111111111111111111",
+  );
+
+  // Hashable and XXHashable
+  T.expectEq(checkHash(UInt64::max), (-1).hash());
+  T.expectEq(checkXXHash(UInt64::max), XXHash(-1));
+  m = UnorderedMap::createFromItems(
+    Array[
+      (UInt64::zero, "zero"),
+      (UInt64::fromInt(Int::min), "half"),
+      (UInt64::max, "max"),
+    ],
+  );
+  T.expectEq(m.size(), 3);
+  T.expectEq(m.get(UInt64::zero), "zero");
+  T.expectEq(m.get(UInt64::fromInt(Int::min)), "half");
+  T.expectEq(m.get(UInt64::max), "max");
+}
+
+@test
+fun testToFloat(): void {
+  T.expectEq(UInt64::zero.toFloat(), 0.0);
+  T.expectEq(UInt64::one.toFloat(), 1.0);
+  T.expectEq(UInt64::fromInt(42).toFloat(), 42.0);
+  // 2^53 is exact in IEEE-754 double
+  p53 = UInt64::one.shl(53);
+  T.expectEq(p53.toFloat(), 9007199254740992.0);
+  // 2^63 must be positive 9223372036854775808.0 (not negative!)
+  half = UInt64::fromInt(Int::min);
+  T.expectTrue(half.toFloat() > 0.0);
+  T.expectEq(half.toFloat(), 9223372036854775808.0);
+  // 2^64 - 1 rounds to 2^64 = 18446744073709551616.0
+  T.expectTrue(UInt64::max.toFloat() > 0.0);
+  T.expectEq(UInt64::max.toFloat(), 18446744073709551616.0);
+  // Double-rounding edge case:
+  // 2^63 + 2^10 + 1 = 0x8000000000000401 is strictly above the midpoint
+  // between 2^63 and 2^63 + 2^11 (midpoint is 2^63 + 2^10 = 0x8000000000000400).
+  // Exact round-to-nearest-even must round UP to 2^63 + 2^11 = 9223372036854777856.0.
+  aboveMid = UInt64::fromInt(Int::min).or(UInt64::fromInt(0x401));
+  T.expectEq(aboveMid.toFloat(), 9223372036854777856.0);
+  // Exact midpoint 2^63 + 2^10 = 0x8000000000000400 rounds to even -> 2^63.
+  exactMid = UInt64::fromInt(Int::min).or(UInt64::fromInt(0x400));
+  T.expectEq(exactMid.toFloat(), 9223372036854775808.0);
+}
+
+module end;

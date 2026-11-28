@@ -154,7 +154,7 @@ Precedence when multiple export annotations exist: target-specific (`@cpp_export
 
 | Skip Type | LLVM IR | C (`runtime.h`) | Notes |
 | --- | --- | --- | --- |
-| `Int` | `i64` | `int64_t` (`SkipInt`) | Always 64-bit, even on `wasm32`. |
+| `Int` / `UInt64` | `i64` | `int64_t` (`SkipInt`) / `uint64_t` | Always 64-bit, even on `wasm32`. |
 | `Int32` / `UInt32` | `i32` | `int32_t` / `uint32_t` | Exact 32-bit match. Use for C `uint32_t` bool returns! |
 | `Int16` / `UInt16` | `i16 zeroext` | `int16_t` / `uint16_t` | Zero-extended. |
 | `Int8` / `UInt8` | `i8 zeroext` | `int8_t` / `uint8_t` | Zero-extended. |

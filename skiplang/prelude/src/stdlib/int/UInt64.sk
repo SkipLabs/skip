@@ -1,0 +1,214 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+value class UInt64 private (private value: Int) uses Orderable, Show, Hashable {
+  const zero: UInt64 = UInt64(0);
+  const one: UInt64 = UInt64(1);
+  const min: UInt64 = UInt64(0);
+  const max: UInt64 = UInt64(-1);
+
+  static fun fromInt(n: Int): UInt64 {
+    UInt64(n)
+  }
+
+  static fun truncate(n: Int): UInt64 {
+    UInt64(n)
+  }
+
+  static fun create(n: Int): UInt64 {
+    if (n < 0) {
+      throw InvalidIntegralCastError(n, "UInt64")
+    };
+    UInt64(n)
+  }
+
+  static fun fromStringOption(s: String): ?UInt64 {
+    iter = s.getIter();
+    first = iter.next() match {
+    | Some(ch) if (ch >= '0' && ch <= '9') -> ch.code() - 48
+    | _ -> return None()
+    };
+    acc = first;
+    // UInt64::max == 18446744073709551615 == 1844674407370955161 * 10 + 5
+    maxDiv10 = 1844674407370955161;
+    loop {
+      iter.next() match {
+      | None() -> return Some(UInt64(acc))
+      | Some(ch) if (ch >= '0' && ch <= '9') ->
+        d = ch.code() - 48;
+        if (acc.ugt(maxDiv10) || (acc == maxDiv10 && d > 5)) {
+          return None()
+        };
+        !acc = acc * 10 + d
+      | _ -> return None()
+      }
+    }
+  }
+
+  static fun fromString(s: String): UInt64 {
+    static::fromStringOption(s) match {
+    | Some(v) -> v
+    | None() ->
+      invariant_violation("UInt64::fromString: parse error on '" + s + "'")
+    }
+  }
+
+  fun toInt(): Int {
+    this.value
+  }
+
+  fun toFloat(): Float {
+    if (this.value >= 0) {
+      this.value.toFloat()
+    } else {
+      // Shift right by 1 while preserving the sticky bit in bit 0 so signed
+      // Int->Float rounds identically to exact unsigned UInt64->Float without
+      // double rounding, then scale exponent by 2.0 (exact).
+      this.value.ushr(1).or(this.value.and(1)).toFloat() * 2.0
+    }
+  }
+
+  fun ==(other: UInt64): Bool {
+    this.value == other.value
+  }
+
+  fun !=(other: UInt64): Bool {
+    this.value != other.value
+  }
+
+  fun +(other: UInt64): UInt64 {
+    UInt64(this.value + other.value)
+  }
+
+  fun -(other: UInt64): UInt64 {
+    UInt64(this.value - other.value)
+  }
+
+  fun *(other: UInt64): UInt64 {
+    UInt64(this.value * other.value)
+  }
+
+  fun /(other: UInt64): UInt64 {
+    n = this.value;
+    d = other.value;
+    if (d == 0) {
+      throw DivisionByZeroException()
+    } else if (n >= 0 && d > 0) {
+      UInt64(n / d)
+    } else if (d < 0) {
+      UInt64(if (n.ult(d)) 0 else 1)
+    } else {
+      q = (n.ushr(1) / d).shl(1);
+      r = n - q * d;
+      UInt64(if (r.uge(d)) q + 1 else q)
+    }
+  }
+
+  fun %(other: UInt64): UInt64 {
+    n = this.value;
+    d = other.value;
+    if (d == 0) {
+      throw DivisionByZeroException()
+    } else if (n >= 0 && d > 0) {
+      UInt64(n % d)
+    } else if (d < 0) {
+      UInt64(if (n.ult(d)) n else n - d)
+    } else {
+      q = (n.ushr(1) / d).shl(1);
+      r = n - q * d;
+      UInt64(if (r.uge(d)) r - d else r)
+    }
+  }
+
+  fun <(other: UInt64): Bool {
+    this.value.ult(other.value)
+  }
+
+  fun >(other: UInt64): Bool {
+    this.value.ugt(other.value)
+  }
+
+  fun <=(other: UInt64): Bool {
+    this.value.ule(other.value)
+  }
+
+  fun >=(other: UInt64): Bool {
+    this.value.uge(other.value)
+  }
+
+  fun compare(other: UInt64): Order {
+    if (this < other) LT() else if (this == other) EQ() else GT()
+  }
+
+  fun and(other: UInt64): UInt64 {
+    UInt64(this.value.and(other.value))
+  }
+
+  fun or(other: UInt64): UInt64 {
+    UInt64(this.value.or(other.value))
+  }
+
+  fun xor(other: UInt64): UInt64 {
+    UInt64(this.value.xor(other.value))
+  }
+
+  fun not(): UInt64 {
+    UInt64(this.value.not())
+  }
+
+  fun shl<I: Integral>(count: I): UInt64 {
+    UInt64(this.value.shl(count))
+  }
+
+  fun shr<I: Integral>(count: I): UInt64 {
+    UInt64(this.value.ushr(count))
+  }
+
+  fun ushr<I: Integral>(count: I): UInt64 {
+    UInt64(this.value.ushr(count))
+  }
+
+  fun clz(): Int {
+    this.value.clz()
+  }
+
+  fun ctz(): Int {
+    this.value.ctz()
+  }
+
+  fun popcount(): Int {
+    this.value.popcount()
+  }
+
+  fun hash(): Int {
+    this.value.hash()
+  }
+
+  fun toStringHex(): String {
+    this.value.toStringHex()
+  }
+
+  fun toStringBinary(): String {
+    this.value.toStringBinary()
+  }
+
+  fun toString(): String {
+    if (this.value >= 0) {
+      this.value.toString()
+    } else {
+      // Since u = 2*(u >>> 1) + (u & 1) and 10 = 2*5, floor(u / 10) == floor((u >>> 1) / 5),
+      // which always fits in a positive signed Int.
+      q = this.value.ushr(1) / 5;
+      r = this.value - q * 10;
+      q.toString() + r.toString()
+    }
+  }
+
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString())
+  }
+}
