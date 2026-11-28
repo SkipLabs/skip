@@ -36,6 +36,7 @@ export class PostgresExternalService implements ExternalService {
     string,
     Promise<void>
   >();
+  private update_queue: Promise<void> = Promise.resolve();
   private broken: boolean = false;
   private shutting_down: boolean = false;
 
@@ -55,6 +56,16 @@ export class PostgresExternalService implements ExternalService {
         if (this.instance_ops.get(instance) === next)
           this.instance_ops.delete(instance);
       });
+    return next;
+  }
+
+  // Serialize callbacks.update calls across all instances on this service:
+  // each CollectionWriter.update forks and merges the runtime context, so
+  // concurrent updates from two watched instances (e.g. both firing on the
+  // same TRUNCATE statement) would otherwise collide with ConcurrentFork.
+  private enqueueUpdate(op: () => Promise<void>): Promise<void> {
+    const next = this.update_queue.then(op, op);
+    this.update_queue = next.catch(() => {});
     return next;
   }
 
@@ -177,7 +188,7 @@ export class PostgresExternalService implements ExternalService {
     const initData = async () => {
       try {
         if (!(params.syncHistoricData ?? true)) {
-          await callbacks.update([], true);
+          await this.enqueueUpdate(() => callbacks.update([], true));
         } else {
           const init = await this.client.query(
             format("SELECT * FROM %I;", table),
@@ -188,7 +199,9 @@ export class PostgresExternalService implements ExternalService {
             if (entries.has(k)) entries.get(k)!.push(row);
             else entries.set(k, [row]);
           }
-          await callbacks.update(Array.from(entries), true);
+          await this.enqueueUpdate(() =>
+            callbacks.update(Array.from(entries), true),
+          );
         }
       } catch (e) {
         error(
@@ -207,13 +220,16 @@ export class PostgresExternalService implements ExternalService {
             `
 CREATE OR REPLACE FUNCTION %I() RETURNS TRIGGER AS $f$
 BEGIN
-  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-    PERFORM pg_notify(%L, NEW.%I::text);
+  IF TG_OP = 'TRUNCATE' THEN
+    PERFORM pg_notify(%L, 'T');
+  ELSIF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    PERFORM pg_notify(%L, 'R:' || NEW.%I::text);
   ELSE
-    PERFORM pg_notify(%L, OLD.%I::text);
+    PERFORM pg_notify(%L, 'R:' || OLD.%I::text);
   END IF;
   RETURN NULL;
 END $f$ LANGUAGE PLPGSQL;`,
+            instance,
             instance,
             instance,
             key.col,
@@ -229,6 +245,20 @@ CREATE OR REPLACE TRIGGER %I
 AFTER INSERT OR UPDATE OR DELETE ON %I
 FOR EACH ROW EXECUTE FUNCTION %I();`,
             instance,
+            table,
+            instance,
+          ),
+        );
+        // TRUNCATE triggers must be statement-level in PostgreSQL; attach a
+        // separate trigger reusing the same function so DROP FUNCTION ... CASCADE
+        // cleans up both triggers together.
+        await this.client.query(
+          format(
+            `
+CREATE OR REPLACE TRIGGER %I
+AFTER TRUNCATE ON %I
+FOR EACH STATEMENT EXECUTE FUNCTION %I();`,
+            `${instance}_truncate`,
             table,
             instance,
           ),
@@ -261,21 +291,58 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         // open_instances is updated in the query's continuation.
         (this.open_instances.has(instance) || this.instance_ops.has(instance))
       ) {
-        const query = key.select(table, msg.payload);
-        const k = key.type == "TEXT" ? msg.payload : Number(msg.payload);
-        let ok = false;
-        const run = async () => {
-          const changes = await this.client.query(query);
-          ok = true;
-          await callbacks.update([[k, changes.rows as Json[]]], false);
-        };
-        run().catch((e: unknown) => {
-          if (ok) {
-            error(
-              `Uncaught error triggered by Postgres adapter update (key ${k}, table ${table}):`,
-            )(e);
-          } else {
-            error(`Error executing Postgres query "${query}":`)(e);
+        const payload = msg.payload;
+        if (payload === "T") {
+          // Serialize with row-change notifications on this instance (so a
+          // TRUNCATE can never overtake an earlier in-flight SELECT/update)
+          // and across instances via enqueueUpdate (so two instances watching
+          // the same table never issue concurrent CollectionWriter.update forks).
+          void this.chainInstanceOp(instance, async () => {
+            if (!this.open_instances.has(instance)) return;
+            try {
+              await this.enqueueUpdate(() => callbacks.update([], true));
+            } catch (e: unknown) {
+              error(
+                `Uncaught error triggered by Postgres adapter truncate (table ${table}):`,
+              )(e);
+            }
+          });
+          return;
+        }
+        if (!payload.startsWith("R:")) {
+          error(
+            `Unexpected Postgres notification payload for resource instance ${instance} (table ${table}): ${payload}`,
+          )();
+          return;
+        }
+        const rawKey = payload.slice(2);
+        let query: string;
+        try {
+          query = key.select(table, rawKey);
+        } catch (e: unknown) {
+          error(
+            `Error constructing Postgres query for key "${rawKey}" (table ${table}):`,
+          )(e);
+          return;
+        }
+        const k = key.type == "TEXT" ? rawKey : Number(rawKey);
+        void this.chainInstanceOp(instance, async () => {
+          if (!this.open_instances.has(instance)) return;
+          let ok = false;
+          try {
+            const changes = await this.client.query(query);
+            ok = true;
+            await this.enqueueUpdate(() =>
+              callbacks.update([[k, changes.rows as Json[]]], false),
+            );
+          } catch (e: unknown) {
+            if (ok) {
+              error(
+                `Uncaught error triggered by Postgres adapter update (key ${k}, table ${table}):`,
+              )(e);
+            } else {
+              error(`Error executing Postgres query "${query}":`)(e);
+            }
           }
         });
       }
