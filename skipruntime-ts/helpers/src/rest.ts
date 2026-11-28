@@ -173,8 +173,18 @@ export class SkipServiceBroker {
     key: K,
   ): Promise<V> {
     return this.getArray<K, V>(resource, params, key).then((values) => {
-      if (values.length !== 1 || values[0] === undefined)
-        throw new SkipNonUniqueValueError();
+      if (values.length === 0)
+        throw new SkipNonUniqueValueError(
+          `Key ${JSON.stringify(key)} not found in resource '${resource}'.`,
+        );
+      if (values.length > 1)
+        throw new SkipNonUniqueValueError(
+          `Key ${JSON.stringify(key)} has ${values.length} values in resource '${resource}', expected 1.`,
+        );
+      if (values[0] === undefined)
+        throw new SkipNonUniqueValueError(
+          `Key ${JSON.stringify(key)} has an undefined value in resource '${resource}'.`,
+        );
       return values[0];
     });
   }

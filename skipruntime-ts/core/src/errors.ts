@@ -2,7 +2,12 @@
  * Umbrella type for run-time errors thrown by the Skip runtime.
  * @hideconstructor
  */
-export class SkipError extends Error {}
+export class SkipError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
 
 /**
  * Exception indicating an attempted read/write to a collection that does not exist.
