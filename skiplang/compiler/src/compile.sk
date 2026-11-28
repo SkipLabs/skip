@@ -261,6 +261,7 @@ const classPartitionPolicyKey: String = "COMPILER_CLASS_PARTITION_POLICY";
 const varianceIndexPolicyKey: String = "COMPILER_VARIANCE_INDEX_POLICY";
 const closureBodyPolicyKey: String = "COMPILER_CLOSURE_BODY_POLICY";
 const lambdaAnchorPolicyKey: String = "COMPILER_LAMBDA_ANCHOR_POLICY";
+const allowModulePrivateAccessPolicyKey: String = "COMPILER_ALLOW_MODULE_PRIVATE_ACCESS_POLICY";
 const specializationWorkKey: String = "COMPILER_SPECIALIZATION_WORK";
 
 // Scheduling observation only; never an input to a semantic compiler result.
@@ -706,6 +707,7 @@ fun createFunctionIRMaps(
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
   trackedClosureBodies: Bool,
+  allowModulePrivateAccess: Bool,
 ): (
   SKStore.EHandle<SKStore.IID, ConfigFile>,
   SKStore.EHandle<SKStore.IID, TickFile>,
@@ -738,6 +740,22 @@ fun getOrInitializeBackend(
       SKStore.BoolFile(trackedClosureBodies),
     )
   | _ -> invariant_violation("Unexpected closure body policy")
+  };
+  context.getPersistent(allowModulePrivateAccessPolicyKey) match {
+  | Some(
+    SKStore.BoolFile(previous),
+  ) if (previous != allowModulePrivateAccess) ->
+    print_error(
+      "Changing --allow-module-private-access requires a fresh --init cache.\n",
+    );
+    skipExit(2)
+  | Some(SKStore.BoolFile _) -> void
+  | None() ->
+    context.setPersistent(
+      allowModulePrivateAccessPolicyKey,
+      SKStore.BoolFile(allowModulePrivateAccess),
+    )
+  | _ -> invariant_violation("Unexpected allow-module-private-access policy")
   };
   backendDirName = SKStore.DirName::create("/backend/");
   tickDirName = SKStore.DirName::create("/tick/");
@@ -796,7 +814,7 @@ fun getOrInitializeBackend(
     },
   );
 
-  outerIst = O.makeOuterIst(context);
+  outerIst = O.makeOuterIst(context, allowModulePrivateAccess);
 
   defsProj = outerIst.getFunsProj(context);
   constsProj = outerIst.getConstsProj(context);
@@ -1823,6 +1841,7 @@ fun compile(
   (backendDir, tickDir) = getOrInitializeBackend(
     context,
     config.trackedClosureBodies,
+    config.allowModulePrivateAccess,
   );
   backendDir.writeArray(
     context,
@@ -2102,7 +2121,11 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
 // so the backend mapper never fires — leaving a clean "warm" base that carries
 // the typed stdlib and no unit-specific state.
 fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
-  _ = getOrInitializeBackend(context, config.trackedClosureBodies);
+  _ = getOrInitializeBackend(
+    context,
+    config.trackedClosureBodies,
+    config.allowModulePrivateAccess,
+  );
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
     if (config.canonize_paths) {
