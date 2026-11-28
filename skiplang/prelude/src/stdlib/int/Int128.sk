@@ -12,6 +12,10 @@ native value class Int128 uses Orderable, Show, Hashable {
   @intrinsic
   native static fun fromUInt64(n: Int): Int128;
 
+  static fun fromUInt128(n: UInt128): Int128 {
+    n.toInt128()
+  }
+
   static fun fromHalves(lo: Int, hi: Int): Int128 {
     static::fromUInt64(lo).or(static::fromUInt64(hi).shl(64))
   }
@@ -25,6 +29,12 @@ native value class Int128 uses Orderable, Show, Hashable {
   @intrinsic
   native fun toInt(): Int;
 
+  fun toUInt128(): UInt128 {
+    UInt128::fromInt128(this)
+  }
+
+  // Static methods rather than `const`s so stage0 (which predates Int128) does
+  // not try to synthesize ..computeConst initializers when compiling std.
   static fun zero(): Int128 {
     static::fromInt(0)
   }
@@ -71,25 +81,33 @@ native value class Int128 uses Orderable, Show, Hashable {
   @intrinsic
   private native fun timesImpl(other: Int128): Int128;
 
+  // Signed integer division (truncates toward zero). Wraps `min() / -1` to
+  // `min()` rather than invoking LLVM `sdiv` poison/UB.
   fun /(other: Int128): Int128 {
     if (other == static::zero()) {
       throw DivisionByZeroException()
+    } else if (this == static::min() && other == static::fromInt(-1)) {
+      static::min()
     } else {
       this.unsafe_divImpl(other)
     }
   }
-  // Behavior is undefined if the argument is zero (or min / -1).
+  // Behavior is undefined if the argument is zero or (min / -1).
   @intrinsic
   private native fun unsafe_divImpl(other: Int128): Int128;
 
+  // Signed integer remainder. Returns `0` for `min() % -1` rather than
+  // invoking LLVM `srem` poison/UB.
   fun %(other: Int128): Int128 {
     if (other == static::zero()) {
       throw DivisionByZeroException()
+    } else if (this == static::min() && other == static::fromInt(-1)) {
+      static::zero()
     } else {
       this.unsafe_remImpl(other)
     }
   }
-  // Behavior is undefined if the argument is zero (or min % -1).
+  // Behavior is undefined if the argument is zero or (min % -1).
   @intrinsic
   private native fun unsafe_remImpl(other: Int128): Int128;
 
@@ -235,43 +253,30 @@ native value class Int128 uses Orderable, Show, Hashable {
   }
 
   fun hash(): Int {
-    Hashable.combine(this.lo(), this.hi())
+    // Combine lo and hi with SplitMix64 finalizer for full 64-bit avalanche.
+    x = this.lo().xor(this.hi() * -7046029254386353131);
+    !x = x.xor(x.ushr(30)) * -4658895280553007687;
+    !x = x.xor(x.ushr(27)) * -7723592293110705685;
+    x.xor(x.ushr(31))
   }
 
+  // Relies on Int::toStringHex returning a fixed-width zero-padded 16-char string.
   fun toStringHex(): String {
     this.hi().toStringHex() + this.lo().toStringHex()
   }
 
+  // Relies on Int::toStringBinary returning a fixed-width zero-padded 64-char string.
   fun toStringBinary(): String {
     this.hi().toStringBinary() + this.lo().toStringBinary()
   }
 
   fun toString(): String {
-    if (this == static::zero()) {
-      "0"
-    } else if (this < static::zero()) {
-      "-" + static::unsignedToString(static::zero() - this)
+    if (this < static::zero()) {
+      // Works even for Int128::min() where negate() wraps to min() (unsigned 2^127).
+      "-" + UInt128::fromInt128(this.negate()).toString()
     } else {
-      static::unsignedToString(this)
+      UInt128::fromInt128(this).toString()
     }
-  }
-
-  // Format bits as an unsigned base-10 integer. Works even for Int128::min()
-  // (where `0 - min == min`, whose unsigned value is 2^127).
-  static fun unsignedToString(n: Int128): String {
-    if (n == static::zero()) {
-      return "0"
-    };
-    ten = static::fromInt(10);
-    digits = mutable Vector<Char>[];
-    cur = n;
-    while (cur != static::zero()) {
-      rem = cur.urem(ten).lo();
-      digits.push(Char::fromCode('0'.code() + rem));
-      !cur = cur.udiv(ten);
-    };
-    digits.reverse();
-    String::fromChars(digits.toArray())
   }
 
   fun inspect(): Inspect {

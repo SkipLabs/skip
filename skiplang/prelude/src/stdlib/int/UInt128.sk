@@ -153,7 +153,19 @@ value class UInt128 private (
   }
 
   fun toString(): String {
-    Int128::unsignedToString(this.value)
+    if (this.value == Int128::zero()) {
+      return "0"
+    };
+    ten = Int128::fromInt(10);
+    digits = mutable Vector<Char>[];
+    cur = this.value;
+    while (cur != Int128::zero()) {
+      rem = cur.urem(ten).lo();
+      digits.push(Char::fromCode('0'.code() + rem));
+      !cur = cur.udiv(ten);
+    };
+    digits.reverse();
+    String::fromChars(digits.toArray())
   }
 
   fun inspect(): Inspect {
