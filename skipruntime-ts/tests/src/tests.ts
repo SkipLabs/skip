@@ -817,7 +817,7 @@ const multipleResourcesService: SkipService<
 
 //// testPostgres
 
-type PostgresRow = { id: number; x: number; createdAt: string };
+type PostgresRow = { id: number; x: number; flag: boolean; createdAt: string };
 
 // The last number has not always 6 digits
 const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d/;
@@ -833,6 +833,43 @@ class PostgresRowExtract
         );
       return [key, row.x];
     });
+  }
+}
+
+// Regression check for #1150: Postgres BOOLEAN columns must arrive in mappers
+// as native JS booleans (true/false), not integers (0/1).
+class PostgresBoolCheck
+  implements Mapper<number, PostgresRow, number, boolean>
+{
+  mapEntry(
+    key: number,
+    rows: Values<PostgresRow>,
+  ): Iterable<[number, boolean]> {
+    return rows.toArray().map((row) => {
+      const flag: unknown = row.flag;
+      if (typeof flag !== "boolean")
+        throw new Error(
+          `Expected boolean for Postgres BOOLEAN column, got ${typeof flag} (${String(flag)})`,
+        );
+      if ((flag as unknown) !== true && (flag as unknown) !== false)
+        throw new Error(`Unexpected non-strict boolean value: ${String(flag)}`);
+      return [key, flag];
+    });
+  }
+}
+
+class PostgresBoolResource implements Resource<Input_NN> {
+  instantiate(
+    _collections: Input_NN,
+    context: Context,
+  ): EagerCollection<number, boolean> {
+    return context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test",
+        params: { key: { col: "id", type: "INTEGER" } },
+      })
+      .map(PostgresBoolCheck);
   }
 }
 
@@ -941,11 +978,11 @@ async function trySetupDB(
   if (!pgIsSetup) {
     await pgSetupClient.query(`
 DROP TABLE IF EXISTS skip_test;
-CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, flag BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test (id, x, flag) VALUES (1, 1, true), (2, 2, false), (3, 3, true);
 DROP TABLE IF EXISTS skip_test2;
-CREATE TABLE skip_test2 (id INTEGER, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 100), (2, 100), (3, 100), (3, 100), (3, 100);`);
+CREATE TABLE skip_test2 (id INTEGER, x INTEGER, flag BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test2 (id, x, flag) VALUES (1, 100, true), (2, 100, false), (2, 100, true), (3, 100, false), (3, 100, true), (3, 100, false);`);
     await pgSetupClient.end();
     pgIsSetup = true;
   }
@@ -1029,6 +1066,7 @@ const postgresService = async (inresource: boolean) => {
     },
     resources: {
       resource: inresource ? PostgresResource : InputResource,
+      boolResource: PostgresBoolResource,
       resourceWithException: PostgresResourceWithException,
       streamingResource: StreamingPostgresResource,
     },
@@ -2140,6 +2178,45 @@ export function initTests(
       expect(await service.getAll(streamingResource)).toEqual([[5, [5]]]);
       notifier2.close();
 
+      const boolResource = "boolResource";
+      const boolInstanceId = "unsafe.fixed.resource.ident.bool";
+      await service.instantiateResource(boolInstanceId, boolResource, {});
+      const boolNotifier = new Notifier(service, boolInstanceId);
+      boolNotifier.checkInit([
+        [1, [true]],
+        [3, [true]],
+        [5, [false]],
+      ]);
+      const initBools = await service.getAll<number, boolean>(boolResource);
+      expect(initBools).toEqual([
+        [1, [true]],
+        [3, [true]],
+        [5, [false]],
+      ]);
+      for (const [, vals] of initBools) {
+        for (const v of vals) {
+          expect(typeof v).toEqual("boolean");
+        }
+      }
+      expect((initBools[0]![1][0] as unknown) === true).toEqual(true);
+      expect((initBools[2]![1][0] as unknown) === false).toEqual(true);
+
+      await pgClient.query("UPDATE skip_test SET flag = false WHERE id = 1;");
+      await boolNotifier.wait([[false, [[1, [false]]]]]);
+      const updatedBools = await service.getAll<number, boolean>(boolResource);
+      expect(updatedBools).toEqual([
+        [1, [false]],
+        [3, [true]],
+        [5, [false]],
+      ]);
+      for (const [, vals] of updatedBools) {
+        for (const v of vals) {
+          expect(typeof v).toEqual("boolean");
+        }
+      }
+      expect((updatedBools[0]![1][0] as unknown) === false).toEqual(true);
+      boolNotifier.close();
+
       await service.instantiateResource(
         "unsafe.fixed.resource.ident.3",
         "resourceWithException",
@@ -2167,8 +2244,8 @@ export function initTests(
     } finally {
       await pgClient.query(`
 DROP TABLE IF EXISTS skip_test;
-CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, flag BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test (id, x, flag) VALUES (1, 1, true), (2, 2, false), (3, 3, true);`);
       await pgClient.end();
       await service.close();
     }
