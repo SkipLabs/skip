@@ -112,8 +112,8 @@ export class PolledExternalService implements ExternalService {
   }
 
   shutdown(): Promise<void> {
-    for (const [instance, interval] of Object.entries(this.intervals)) {
-      clearInterval(interval as Timeout);
+    for (const [instance, interval] of this.intervals.entries()) {
+      clearInterval(interval);
       this.intervals.delete(instance);
     }
     return Promise.resolve();
