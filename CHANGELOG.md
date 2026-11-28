@@ -12,11 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    and derives `createGraph`'s input collection types via
    `InputCollections<InputDefs>`, replacing `initialData` with `inputs`
    (`InputDefinition` instances per collection) (#1162, #1811)
- - `Resource.instantiate`, `Mapper.mapEntry`, `Reducer.add`/`remove`, and
-   `LazyCompute.compute` use function-typed properties so contravariant
-   parameter checking is enforced under TypeScript's `strictFunctionTypes`;
-   `Resource` constructors now receive `Json` parameters by default and must
-   validate before narrowing (#1811)
+ - `SkipService.createGraph` uses a function-typed property for contravariant
+   input-collection checking under `strictFunctionTypes` (`Mapper`, `Reducer`,
+   `LazyCompute`, and `Resource` keep method syntax for `this`-receiver
+   soundness and TScert verification); `Resource` constructors now receive
+   `Json` parameters by default and must validate before narrowing (#1811, #1858)
  - `Watermark` and `SubscriptionID` are now nominal wrapper classes (exposing
    `toString()` and `toJSON()`) instead of `Opaque<string>` aliases; note that
    `===` and `Map` keys compare by object identity rather than string value (#1811)
@@ -31,11 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    defined name is in both `collections` and `lazies`, or a defined `lazies`
    entry is not a function (#1811, #1816)
  - `AbstractEagerCollection`, `AbstractLazyCollection`, and
-   `AbstractInputDefinition` are now nominal (branded with a `unique symbol`
-   key private to `@skipruntime/core`) instead of carrying public
-   `__sk_*Brand: undefined` fields; object literals or other structural
-   implementations are no longer accepted and must be replaced by subclasses
-   such as runtime-created collections / `InputDefinition` instances (#1816)
+   `AbstractInputDefinition` are now nominal and sealed (branded with runtime
+   `unique symbol` keys private to `@skipruntime/core` and protected sealed
+   constructors) instead of carrying public `__sk_*Brand: undefined` fields;
+   object literals, structural look-alikes, and external subclasses are
+   rejected—use runtime-created collections and `InputDefinition` instances
+   (#1816, #1858)
 
 ## [0.0.23] - 2026-05-28
 
