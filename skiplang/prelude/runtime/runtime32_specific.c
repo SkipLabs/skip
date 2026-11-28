@@ -339,8 +339,9 @@ _Bool SKIP_parallel_map_native(void) {
 // 128-bit integer compiler-rt helpers for wasm32 (built with -nostdlibinc and
 // linked without libclang_rt.builtins). LLVM lowers `mul`, `sdiv`, `udiv`,
 // `srem`, `urem`, and variable shifts on `i128` to calls to these symbols on
-// wasm32. Marked `used` so LLVM LTO does not dead-strip them before llc
-// codegen introduces the libcalls.
+// wasm32. Marked `weak` so linking alongside libclang_rt.builtins does not
+// cause duplicate symbols, and `used` so LLVM LTO does not dead-strip them
+// before llc codegen introduces the libcalls.
 typedef __int128 ti_int;
 typedef unsigned __int128 tu_int;
 
@@ -354,7 +355,7 @@ static tu_int skip_make_u128(uint64_t lo, uint64_t hi) {
   return ((tu_int)hi << 64) | lo;
 }
 
-__attribute__((used)) tu_int __multi3(tu_int a, tu_int b) {
+__attribute__((weak, used)) tu_int __multi3(tu_int a, tu_int b) {
   uint64_t a_lo = skip_u128_lo(a);
   uint64_t a_hi = skip_u128_hi(a);
   uint64_t b_lo = skip_u128_lo(b);
@@ -377,7 +378,7 @@ __attribute__((used)) tu_int __multi3(tu_int a, tu_int b) {
   return skip_make_u128(lo, hi);
 }
 
-__attribute__((used)) tu_int __ashlti3(tu_int a, int b) {
+__attribute__((weak, used)) tu_int __ashlti3(tu_int a, int32_t b) {
   uint32_t s = (uint32_t)b & 127U;
   if (s == 0) {
     return a;
@@ -390,7 +391,7 @@ __attribute__((used)) tu_int __ashlti3(tu_int a, int b) {
   return skip_make_u128(lo << s, (hi << s) | (lo >> (64 - s)));
 }
 
-__attribute__((used)) tu_int __lshrti3(tu_int a, int b) {
+__attribute__((weak, used)) tu_int __lshrti3(tu_int a, int32_t b) {
   uint32_t s = (uint32_t)b & 127U;
   if (s == 0) {
     return a;
@@ -403,7 +404,7 @@ __attribute__((used)) tu_int __lshrti3(tu_int a, int b) {
   return skip_make_u128((lo >> s) | (hi << (64 - s)), hi >> s);
 }
 
-__attribute__((used)) ti_int __ashrti3(ti_int a, int b) {
+__attribute__((weak, used)) ti_int __ashrti3(ti_int a, int32_t b) {
   uint32_t s = (uint32_t)b & 127U;
   if (s == 0) {
     return a;
@@ -419,6 +420,9 @@ __attribute__((used)) ti_int __ashrti3(ti_int a, int b) {
 }
 
 static tu_int skip_udivmodti4(tu_int a, tu_int b, tu_int* rem) {
+  if (b == 0) {
+    __builtin_trap();
+  }
   if (b > a) {
     if (rem) {
       *rem = a;
@@ -457,17 +461,17 @@ static tu_int skip_udivmodti4(tu_int a, tu_int b, tu_int* rem) {
   return q;
 }
 
-__attribute__((used)) tu_int __udivti3(tu_int a, tu_int b) {
+__attribute__((weak, used)) tu_int __udivti3(tu_int a, tu_int b) {
   return skip_udivmodti4(a, b, (tu_int*)0);
 }
 
-__attribute__((used)) tu_int __umodti3(tu_int a, tu_int b) {
+__attribute__((weak, used)) tu_int __umodti3(tu_int a, tu_int b) {
   tu_int r = 0;
   skip_udivmodti4(a, b, &r);
   return r;
 }
 
-__attribute__((used)) ti_int __divti3(ti_int a, ti_int b) {
+__attribute__((weak, used)) ti_int __divti3(ti_int a, ti_int b) {
   int neg_a = a < 0;
   int neg_b = b < 0;
   tu_int ua = neg_a ? -(tu_int)a : (tu_int)a;
@@ -476,7 +480,7 @@ __attribute__((used)) ti_int __divti3(ti_int a, ti_int b) {
   return (neg_a != neg_b) ? (ti_int)(-q) : (ti_int)q;
 }
 
-__attribute__((used)) ti_int __modti3(ti_int a, ti_int b) {
+__attribute__((weak, used)) ti_int __modti3(ti_int a, ti_int b) {
   int neg_a = a < 0;
   int neg_b = b < 0;
   tu_int ua = neg_a ? -(tu_int)a : (tu_int)a;

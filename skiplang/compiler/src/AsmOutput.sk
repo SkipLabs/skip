@@ -3044,8 +3044,11 @@ private fun llvmGetAddr(
   asm.print(", i64 %s, %D\n" % firstByteOffset % instr);
 
   // Compute what we know about the alignment, by taking the lowest bit that
-  // could possibly be set in the address.
-  memAlignment = computeAlignment(instr.addrByteAlignment, firstByteOffset);
+  // could possibly be set in the address. On 32-bit targets (wasm32/SKIP32),
+  // heap allocations (interned/copied/large-page objects and arrays) are only
+  // guaranteed ptrByteSize-byte (4-byte) aligned, so cap heap alignment there.
+  baseAlign = min(instr.addrByteAlignment, asm.common.config.ptrByteSize);
+  memAlignment = computeAlignment(baseAlign, firstByteOffset);
 
   (addr, loadTypeName, !normal, bo - firstByteOffset * 8, memAlignment)
 }
@@ -3298,6 +3301,10 @@ private fun llvmComputeArrayAddress(
 
   index = optinfo.getInstr(indexID);
 
+  // On 32-bit targets, heap allocations (including arrays) are only guaranteed
+  // ptrBitSize (32-bit) alignment.
+  maxBitAlign = min(64, asm.common.config.ptrBitSize);
+
   index.constantInteger() match {
   | Some(n) ->
     if (n < 0 || n >= (Int::max / 4) / slotInfo.bitSize) {
@@ -3309,7 +3316,7 @@ private fun llvmComputeArrayAddress(
 
     // Compile-time constant index, just multiply it out now.
     bitOffset = n * slotInfo.bitSize;
-    byteAlign = computeAlignment(bitOffset, 64) / 8;
+    byteAlign = computeAlignment(bitOffset, maxBitAlign) / 8;
     (vecID, slotInfo, bitOffset, byteAlign)
   | None() ->
     multmp = asm.llvmIdentifier("scaled_vec_index");
@@ -3344,7 +3351,7 @@ private fun llvmComputeArrayAddress(
         pos,
     );
 
-    byteAlign = computeAlignment(slotInfo.bitSize, 64) / 8;
+    byteAlign = computeAlignment(slotInfo.bitSize, maxBitAlign) / 8;
 
     (fakeAddrInstr.id, slotInfo, 0, byteAlign)
   }

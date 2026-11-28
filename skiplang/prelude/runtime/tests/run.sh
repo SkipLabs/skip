@@ -23,9 +23,9 @@ if [ "$(uname -s)" = Darwin ]; then
     -Wl,-dead_strip -pthread "$runtime_test_sources/mapping_growth.c" \
     -o "$runtime_test_dir/mapping-growth"
   "$runtime_test_dir/mapping-growth"
-  exit 0
 fi
 
+if [ "$(uname -s)" != Darwin ]; then
 clang -Wall -Wextra -Werror "$runtime_test_sources/alloc_size_classes.c" \
   -o "$runtime_test_dir/size-classes"
 "$runtime_test_dir/size-classes"
@@ -74,8 +74,16 @@ for runtime_test_opt in -O0 -O2; do
     "$runtime_test_sources/reference_masks.c" -o "$runtime_test_dir/reference-masks"
   "$runtime_test_dir/reference-masks"
 done
+fi
 
-runtime_test_linker=$(command -v wasm-ld || command -v wasm-ld-20)
+runtime_test_linker=$(command -v wasm-ld || command -v wasm-ld-20 || true)
+if [ -z "$runtime_test_linker" ]; then
+  if [ "$(uname -s)" = Darwin ]; then
+    exit 0
+  fi
+  echo "wasm-ld not found" >&2
+  exit 1
+fi
 clang --target=wasm32 -std=c2x -O2 -nostdlib -nostdlibinc -fno-builtin \
   -Wall -Wextra -Werror -I"$runtime_test_sources/.." \
   -c "$runtime_test_sources/region_checkpoint_wasm.c" \
@@ -120,3 +128,19 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
   --export=SKIP_Float_toStringShortest \
   "$runtime_test_dir/float-to-string.o" -o "$runtime_test_dir/float-to-string.wasm"
 node "$runtime_test_sources/float_to_string.mjs" "$runtime_test_dir/float-to-string.wasm"
+
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/../runtime32_specific.c" \
+  -o "$runtime_test_dir/runtime32-specific.o"
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/int128_helpers.c" \
+  -o "$runtime_test_dir/int128-helpers.o"
+"$runtime_test_linker" --no-entry --export-memory --gc-sections \
+  --export=result_buf \
+  --export=test_mul --export=test_ashl --export=test_lshr --export=test_ashr \
+  --export=test_udiv --export=test_umod --export=test_div --export=test_mod \
+  "$runtime_test_dir/int128-helpers.o" "$runtime_test_dir/runtime32-specific.o" \
+  -o "$runtime_test_dir/int128-helpers.wasm"
+node "$runtime_test_sources/int128_helpers.mjs" "$runtime_test_dir/int128-helpers.wasm"
