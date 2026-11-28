@@ -122,6 +122,7 @@ class Config{
   canonize_paths: Bool,
   cwd: WorkingDirectory,
   batch_mode: Bool = false,
+  allowModulePrivateAccess: Bool = false,
 } {
   static fun make(
     results: Cli.ParseResults,
@@ -372,6 +373,9 @@ class Config{
       preambles,
       cwd,
       canonize_paths,
+      allowModulePrivateAccess => results.getBool(
+        "allow-module-private-access",
+      ),
     }
   }
 

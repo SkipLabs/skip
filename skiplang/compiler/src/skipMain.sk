@@ -12,6 +12,7 @@ module SkipMain;
 
 fun type_program(
   context: mutable SKStore.Context,
+  allowModulePrivateAccess: Bool = false,
 ): SKStore.EHandle<SKStore.SID, SkipTyping.DefFile> {
   parsed_program = FileCache.fileDir.map(
     FileCache.InputSource::keyType,
@@ -56,7 +57,11 @@ fun type_program(
   );
 
   SourcePositions.populate(context, ast);
-  (defsDir, childDir) = SkipExpand.program(context, ast);
+  (defsDir, childDir) = SkipExpand.program(
+    context,
+    ast,
+    allowModulePrivateAccess,
+  );
   inhDir = SkipInherit.populateClassesDir(context);
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
   SkipNaming.populateFuns(context, defsDir);

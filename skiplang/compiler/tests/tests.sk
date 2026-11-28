@@ -398,6 +398,100 @@ private fun boundsPassEliminatesCheck(): void {
   T.expectTrue(removed.success(), removed.stderr);
 }
 
+// Verify --allow-module-private-access bypasses module-level private
+// enforcement (functions, classes, consts, type aliases) while keeping default
+// enforcement intact when the flag is omitted.
+private fun allowModulePrivateAccess(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  bin = dir + "/program";
+  oneShotBin = dir + "/program_oneshot";
+  data = dir + "/data";
+  FileSystem.writeTextFile(
+    source,
+    "module Secret;\n" +
+      "private const kVal: Int = 10;\n" +
+      "private type Alias = Int;\n" +
+      "private class Box(v: Alias)\n" +
+      "private fun helper(b: Box): Alias { b.v + kVal }\n" +
+      "module end;\n" +
+      "module Caller;\n" +
+      "fun run(): Int {\n" +
+      "  x: Secret.Alias = 32;\n" +
+      "  Secret.helper(Secret.Box(x)) + Secret.kVal\n" +
+      "}\n" +
+      "module end;\n" +
+      "fun main(): void {\n" +
+      "  print_raw(Caller.run().toString())\n" +
+      "}\n",
+  );
+  try {
+    // 1. Without the flag, compiling must fail with the privacy error.
+    denied = System.subprocess(compile_cmd(Array[source], bin)).fromSuccess();
+    T.expectFalse(denied.success(), "Expected compile error without flag");
+    T.expectTrue(
+      denied.stderr.contains("Cannot access a private module element"),
+      denied.stderr,
+    );
+
+    // 2. With --allow-module-private-access, compiling succeeds and runs cleanly.
+    allowed = System.subprocess(
+      compile_cmd(Array[source], bin).concat(
+        Array["--allow-module-private-access"],
+      ),
+    ).fromSuccess();
+    T.expectTrue(
+      allowed.success(),
+      "Compile with --allow-module-private-access failed: " + allowed.stderr,
+    );
+    ran = System.subprocess(Array[bin]).fromSuccess();
+    T.expectTrue(ran.success(), ran.stderr);
+    T.expectEq(ran.stdout, "52");
+
+    // 3. Also works under --one-shot (ReleaseBuild path).
+    oneShot = System.subprocess(
+      compile_cmd(Array[source], oneShotBin).concat(
+        Array["--one-shot", "--allow-module-private-access"],
+      ),
+    ).fromSuccess();
+    T.expectTrue(
+      oneShot.success(),
+      "One-shot compile with --allow-module-private-access failed: " +
+        oneShot.stderr,
+    );
+    ranOneShot = System.subprocess(Array[oneShotBin]).fromSuccess();
+    T.expectTrue(ranOneShot.success(), ranOneShot.stderr);
+    T.expectEq(ranOneShot.stdout, "52");
+
+    // 4. Changing --allow-module-private-access across persistent --init/--data
+    // invocations must fail loudly rather than reuse stale privacy decisions.
+    initRun = System.subprocess(
+      compile_cmd(Array[source], bin).concat(
+        Array["--allow-module-private-access", "--check", "--init", data],
+      ),
+    ).fromSuccess();
+    T.expectTrue(initRun.success(), "init check failed: " + initRun.stderr);
+    mismatch = System.subprocess(
+      compile_cmd(Array[source], bin).concat(Array["--check", "--data", data]),
+    ).fromSuccess();
+    T.expectEq(mismatch.exitcode(), 2, mismatch.stderr);
+    T.expectTrue(
+      mismatch.stderr.contains(
+        "Changing --allow-module-private-access requires a fresh --init cache.",
+      ),
+      mismatch.stderr,
+    );
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  removed = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+  T.expectTrue(removed.success(), removed.stderr);
+}
+
 // A field chain and an unfinished parent cross generic-name work rows.
 private fun incrementalClassContinuations(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
@@ -3347,6 +3441,10 @@ untracked fun main(): void {
       T.Test{
         name => "bounds_pass_eliminates_check",
         func => () ~> boundsPassEliminatesCheck(),
+      },
+      T.Test{
+        name => "allow_module_private_access",
+        func => () ~> allowModulePrivateAccess(),
       },
     ],
   );
