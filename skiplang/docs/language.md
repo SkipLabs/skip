@@ -318,7 +318,7 @@ Chilling & constants:
 ### Numeric Types
 
 - `Int` (64-bit signed), `Float` (64-bit IEEE 754), `Bool`, `Char` (Unicode scalar), `Void` (`void`), `String` (UTF-8).
-- Fixed-width integers (in prelude): `Int8`, `Int16`, `Int32`, `UInt8`, `UInt16`, `UInt32` — constructed via `::create(n)` (checked) or `::truncate(n)` (wrapping). Arithmetic/bitwise operators on `Integral` widen to `Int`.
+- Fixed-width integers (in prelude): `Int8`, `Int16`, `Int32`, `UInt8`, `UInt16`, `UInt32` — constructed via `::create(n)` (checked) or `::truncate(n)` (wrapping). Arithmetic/bitwise operators on `Integral` widen to `Int`. `UInt64` is a 64-bit unsigned `value class` with full unsigned arithmetic, ordering, bitwise ops, and string parsing/formatting.
 
 ---
 
