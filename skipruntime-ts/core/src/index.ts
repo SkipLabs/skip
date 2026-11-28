@@ -46,7 +46,7 @@ import {
   AbstractLazyCollection,
   type SharedCollections,
 } from "./api.js";
-import type { eagerCollectionBrand, lazyCollectionBrand } from "./brands.js";
+import { eagerCollectionBrand, lazyCollectionBrand } from "./brands.js";
 
 import {
   SkipClassNameError,
@@ -122,7 +122,11 @@ export class ServiceDefinition {
     // service has the required shape; fail fast with an actionable message
     // instead of a TypeError from deep inside service initialization.
     const inputs: unknown = service.inputs;
-    if (typeof inputs !== "object" || inputs === null) {
+    if (
+      typeof inputs !== "object" ||
+      inputs === null ||
+      Array.isArray(inputs)
+    ) {
       throw new Error(
         "initialData" in service
           ? "`SkipService.initialData` has been replaced by `inputs`: define each input collection as `inputs: { <name>: new InputDefinition(<initial entries>) }`."
@@ -279,7 +283,8 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements LazyCollection<K, V>
 {
-  declare readonly [lazyCollectionBrand]: never;
+  readonly [lazyCollectionBrand]: typeof lazyCollectionBrand =
+    lazyCollectionBrand;
 
   constructor(
     readonly lazyCollection: string,
@@ -323,7 +328,8 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements EagerCollection<K, V>
 {
-  declare readonly [eagerCollectionBrand]: never;
+  readonly [eagerCollectionBrand]: typeof eagerCollectionBrand =
+    eagerCollectionBrand;
 
   constructor(
     public readonly collection: string,

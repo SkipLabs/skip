@@ -1,11 +1,11 @@
 import {
-  AbstractInputDefinition,
+  type AbstractInputDefinition,
   type EagerCollection,
   type Resource,
 } from "@skipruntime/core";
 import { runService, type SkipServer } from "@skipruntime/server";
 
-class CustomInputDef extends AbstractInputDefinition {}
+declare const customInputDef: AbstractInputDefinition;
 
 type ResourceInputs = {
   readonly names: EagerCollection<string, string>;
@@ -17,10 +17,13 @@ class Names implements Resource<ResourceInputs> {
   }
 }
 
+// Non-`InputDefinition` entries of `AbstractInputDefinition` must map to
+// `AbstractEagerCollection` (not `never`) in `InputCollections`, so they cannot
+// silently flow into a narrowed `EagerCollection<string, string>` resource.
 export function start(): Promise<SkipServer> {
   return runService({
-    inputs: { names: new CustomInputDef() },
+    inputs: { names: customInputDef },
     resources: { names: Names },
-    createGraph: (ic) => ({ names: ic.names }),
+    createGraph: (ic): ResourceInputs => ({ names: ic.names }),
   });
 }

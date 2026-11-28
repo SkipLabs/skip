@@ -16,7 +16,7 @@ export * from "./errors.js";
 export type { Managed, Json, JsonObject, Opaque, DepSafe };
 export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
-import type {
+import {
   eagerCollectionBrand,
   lazyCollectionBrand,
   inputDefinitionBrand,
@@ -37,19 +37,24 @@ import type {
  * rejected.
  */
 export abstract class AbstractEagerCollection {
-  declare readonly [eagerCollectionBrand]: never;
+  readonly [eagerCollectionBrand]: typeof eagerCollectionBrand =
+    eagerCollectionBrand;
+
+  protected constructor(_seal: typeof eagerCollectionBrand) {}
 }
 
 /**
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
- * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
- * so only subclasses (such as runtime-created `LazyCollection` instances)
- * inhabit this type; object literals and other structural look-alikes are
- * rejected.
+ * Nominally branded and sealed with a `unique symbol` private to
+ * `@skipruntime/core`, so only runtime-created `LazyCollection` instances
+ * inhabit this type; object literals and external subclasses are rejected.
  */
 export abstract class AbstractLazyCollection {
-  declare readonly [lazyCollectionBrand]: never;
+  readonly [lazyCollectionBrand]: typeof lazyCollectionBrand =
+    lazyCollectionBrand;
+
+  protected constructor(_seal: typeof lazyCollectionBrand) {}
 }
 
 /**
@@ -77,11 +82,11 @@ export interface Mapper<
    * @param context - The Skip runtime context, which can be used to create/access new collections during the map
    * @returns Key-value pairs to associate in the output collection.
    */
-  readonly mapEntry: (
-    key: K1,
-    values: Values<V1>,
-    context: Context,
-  ) => Iterable<[K2, V2]>;
+  // INVARIANT: Keep as a method (not a function-typed property). Implementing
+  // classes define prototype methods that rely on `this` (e.g. `this.users`);
+  // property syntax declares an unbound own function property (unsound if
+  // detached) and breaks class verification under TScert.
+  mapEntry(key: K1, values: Values<V1>, context: Context): Iterable<[K2, V2]>;
 }
 
 /**
@@ -106,7 +111,8 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
-  readonly add: (accum: A | null, value: V & DepSafe) => A;
+  // INVARIANT: Keep as a method (see `Mapper.mapEntry`).
+  add(accum: A | null, value: V & DepSafe): A;
 
   /**
    * Exclude a previously added value from the accumulated value.
@@ -120,7 +126,8 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The removed value.
    * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
-  readonly remove: (accum: A, value: V & DepSafe) => A | null;
+  // INVARIANT: Keep as a method (see `Mapper.mapEntry`).
+  remove(accum: A, value: V & DepSafe): A | null;
 }
 
 /**
@@ -365,11 +372,8 @@ export interface LazyCompute<K extends Json, V extends Json> {
    * @param key - The requested key / input.
    * @returns The values of the lazy function for `key`.
    */
-  readonly compute: (
-    self: LazyCollection<K, V>,
-    key: K,
-    context: Context,
-  ) => Iterable<V>;
+  // INVARIANT: Keep as a method (see `Mapper.mapEntry`).
+  compute(self: LazyCollection<K, V>, key: K, context: Context): Iterable<V>;
 }
 
 /**
@@ -562,29 +566,31 @@ export type InputCollections<Defs> = {
 };
 
 /**
- * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
+ * Constraint ensuring every string-keyed property of `T` is a required
+ * `AbstractInputDefinition`.
  *
- * `T` must be a plain record: arrays, tuples, and other iterables are rejected
- * via the `[Symbol.iterator]?: never` member, since the runtime builds plain
- * objects keyed by collection name (while still allowing a collection named
- * `length`).
+ * INVARIANT: Uses `keyof T & string` (not `& { readonly [Symbol.iterator]?: never }`).
+ * Non-homomorphic `keyof T & string` rejects arrays and tuples (their string
+ * keys like `length` and `map` are not `AbstractInputDefinition`), rejects
+ * optional `?` properties, still allows a record collection legitimately named
+ * `length`, and imposes no unsatisfiable negative symbol invariant on open
+ * record types under sound subtyping (TScert).
  */
 export type AllInputDefs<T> = {
-  readonly [K in keyof T]: AbstractInputDefinition;
-} & { readonly [Symbol.iterator]?: never };
+  readonly [K in keyof T & string]: AbstractInputDefinition;
+};
 
 /**
- * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
- * `AbstractLazyCollection`.
+ * Constraint ensuring every string-keyed property of `T` is a required
+ * `AbstractEagerCollection` or `AbstractLazyCollection`.
  *
- * `T` must be a plain record: arrays, tuples, and other iterables are rejected
- * via the `[Symbol.iterator]?: never` member, since the runtime builds plain
- * objects keyed by collection name (while still allowing a collection named
- * `length`).
+ * INVARIANT: Uses `keyof T & string` (see `AllInputDefs`).
  */
 export type AllSharedCollections<T> = {
-  readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
-} & { readonly [Symbol.iterator]?: never };
+  readonly [K in keyof T & string]:
+    | AbstractEagerCollection
+    | AbstractLazyCollection;
+};
 
 /**
  * Resource provided by a `SkipService`.
@@ -603,10 +609,11 @@ export interface Resource<
    * @param context - Skip Runtime internal state.
    * @returns An eager collection containing the outputs of this resource for the given parameters, produced from the shared reactive compute graph output collections of the service's `createGraph`.
    */
-  readonly instantiate: (
+  // INVARIANT: Keep as a method (see `Mapper.mapEntry`).
+  instantiate(
     collections: Collections,
     context: Context,
-  ) => AbstractEagerCollection;
+  ): AbstractEagerCollection;
 }
 
 /**
@@ -647,7 +654,10 @@ export type InitialData<Inputs extends NamedEagerCollections> = {
  * literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractInputDefinition {
-  declare readonly [inputDefinitionBrand]: never;
+  readonly [inputDefinitionBrand]: typeof inputDefinitionBrand =
+    inputDefinitionBrand;
+
+  protected constructor(_seal: typeof inputDefinitionBrand) {}
 }
 
 /**
@@ -663,7 +673,7 @@ export class InputDefinition<
   readonly initial: readonly Entry<K, V>[];
 
   constructor(initial: readonly Entry<K, V>[] = []) {
-    super();
+    super(inputDefinitionBrand);
     this.initial = initial;
   }
 }

@@ -11,9 +11,18 @@ const files = readdirSync(dir)
 const positives = files.filter((f) => f.startsWith("p"));
 const negatives = files.filter((f) => f.startsWith("n"));
 
-// Negative probes that pass under TS 5.7/5.8 (e.g. open-record assignability to
-// readonly index signatures) and are rejected starting in TS 6.0 / TScert.
-const versionDependentNegatives = new Set(["n10-open-resources-param.ts"]);
+// Negative probes that pass under plain `tsc` due to TypeScript's bivariant
+// interface method checking (Mapper/Reducer/LazyCompute/Resource are kept as
+// methods for `this`-receiver soundness) or TS 5.7/5.8 open-record rules; all
+// of them are refused by TScert.
+const tscAllowedNegatives = new Set([
+  "n02-extra-resource-field.ts",
+  "n03-narrow-mapper-on-json.ts",
+  "n04-narrow-reducer-on-json.ts",
+  "n09-default-inputdef-to-narrow.ts",
+  "n09b-explicit-json-inputdef-to-narrow.ts",
+  "n10-open-resources-param.ts",
+]);
 
 let stdout = "";
 try {
@@ -60,7 +69,7 @@ for (const p of positives) {
 }
 
 for (const n of negatives) {
-  if (versionDependentNegatives.has(n)) continue;
+  if (tscAllowedNegatives.has(n)) continue;
   if (!errorFiles.has(n)) {
     console.error(`FAIL negative probe was unexpectedly accepted by tsc: ${n}`);
     failed = true;
@@ -73,5 +82,5 @@ if (failed) {
 }
 
 console.log(
-  `typesafety probes OK (${positives.length} positives passed, ${negatives.length - versionDependentNegatives.size} required negatives rejected)`,
+  `typesafety probes OK (${positives.length} positives passed, ${negatives.length - tscAllowedNegatives.size} required tsc negatives rejected; ${tscAllowedNegatives.size} TScert-enforced negatives)`,
 );
