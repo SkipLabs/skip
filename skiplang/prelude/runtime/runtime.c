@@ -104,9 +104,11 @@ void SKIP_global_unlock() {
 #endif
 }
 
-sk_contexts_with_actions_t SKIP_context_sync_no_lock(
-    uint64_t txTime, Contexts old_contexts, Context delta, char* synchronizer,
-    uint32_t sync, char* lockF, Fork fork) {
+ContextsWithActions SKIP_context_sync_no_lock(uint64_t txTime,
+                                              Contexts old_contexts,
+                                              Context delta, char* synchronizer,
+                                              uint32_t sync, char* lockF,
+                                              Fork fork) {
   Contexts contexts = SKIP_contexts_get_unsafe();
   if (contexts == NULL) {
 #ifdef SKIP64
@@ -125,9 +127,9 @@ sk_contexts_with_actions_t SKIP_context_sync_no_lock(
     SKIP_throw_cruntime(ERROR_SYNC_SAME_CONTEXT);
   }
   char* rtmp = SKIP_resolve_context(txTime, root, delta, synchronizer, lockF);
-  sk_contexts_with_actions_t res =
-      SKIP_check_fork_context(contexts, fork, rtmp);
-  Contexts new_contexts = SKIP_intern_shared(res.contexts);
+  ContextsWithActions res = SKIP_check_fork_context(contexts, fork, rtmp);
+  Contexts new_contexts =
+      SKIP_intern_shared(SKIP_contexts_with_actions_get_contexts(res));
   sk_commit(new_contexts, sync);
   sk_free_root(old_contexts);
   // free current reference
@@ -139,17 +141,14 @@ sk_contexts_with_actions_t SKIP_context_sync_no_lock(
   sk_print_ctx_table();
 #endif
   sk_incr_ref_count(new_contexts);
-  res.contexts = new_contexts;
-  return res;
+  return SKIP_contexts_with_actions_with_contexts(res, new_contexts);
 }
 
-sk_contexts_with_actions_t SKIP_context_sync(uint64_t txTime,
-                                             Contexts old_contexts,
-                                             Context delta, char* synchronizer,
-                                             uint32_t sync, char* lockF,
-                                             Fork fork) {
+ContextsWithActions SKIP_context_sync(uint64_t txTime, Contexts old_contexts,
+                                      Context delta, char* synchronizer,
+                                      uint32_t sync, char* lockF, Fork fork) {
   sk_global_lock();
-  sk_contexts_with_actions_t new_root = SKIP_context_sync_no_lock(
+  ContextsWithActions new_root = SKIP_context_sync_no_lock(
       txTime, old_contexts, delta, synchronizer, sync, lockF, fork);
   sk_global_unlock();
   SKIP_call_after_unlock(synchronizer, delta);

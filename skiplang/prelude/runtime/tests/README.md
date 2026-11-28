@@ -267,3 +267,13 @@ wasm-ld --no-entry --export-memory --export=SKIP_Float_toStringShortest \
   /tmp/float-to-string.o -o /tmp/float-to-string.wasm
 node skiplang/prelude/runtime/tests/float_to_string.mjs /tmp/float-to-string.wasm
 ```
+
+# Wasm32 FFI `sret` ABI check
+
+`run.sh` also compiles every wasm32 runtime C file to LLVM IR and checks that
+no Skip FFI boundary function (`SKIP_*`, `sk_get_*`, `sk_call_*`,
+`sk_create_*`, `sk_parallel_*`) uses Clang's `sret(...)` hidden out-parameter
+ABI. On `wasm32-unknown-unknown`, Clang lowers multi-field C struct returns to
+`sret`, whereas `skc` declares multi-field value class returns directly as
+multi-value LLVM structs (`{ ptr, ptr }`), which would silently misalign
+parameters and corrupt memory at runtime (#1389).

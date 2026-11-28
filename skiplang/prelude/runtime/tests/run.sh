@@ -18,6 +18,25 @@ clang -std=c2x -O2 -g -Wall -Wextra -Werror \
   "$runtime_test_sources/xxhash64_native.c" -o "$runtime_test_dir/xxhash64-native"
 "$runtime_test_dir/xxhash64-native"
 
+# Guard against wasm32 struct-return (`sret`) ABI mismatches on Skip<->C FFI
+# functions (#1389): `skc` lowers multi-field value classes to multi-value LLVM
+# returns, while Clang on wasm32 lowers C struct returns to an `sret` parameter.
+for runtime_src in \
+  copy.c free.c hash.c hashtable.c intern.c memory.c obstack.c runtime.c \
+  stdlib.c stack.c string.c native_eq.c splitmix64.c xoroshiro128plus.c \
+  xxhash64.c runtime32_specific.c; do
+  clang -DSKIP32 --target=wasm32 -S -emit-llvm -nostdlibinc \
+    -Wall -Wextra -Werror -Wno-sign-conversion -Wno-sometimes-uninitialized \
+    -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt -fstrict-flex-arrays=3 \
+    -I"$runtime_test_sources/.." \
+    "$runtime_test_sources/../$runtime_src" -o "$runtime_test_dir/$runtime_src.ll"
+  if grep -E '^(define|declare) .*@(SKIP_|sk_get_|sk_call_|sk_create_|sk_parallel_).*sret\(' \
+    "$runtime_test_dir/$runtime_src.ll"; then
+    echo "error: wasm32 FFI function in $runtime_src uses sret ABI (#1389)" >&2
+    exit 1
+  fi
+done
+
 # The checks below are Linux-specific (glibc mutex internals, GNU ld flags).
 if [ "$(uname -s)" = Darwin ]; then
   clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \

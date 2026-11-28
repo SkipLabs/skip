@@ -2560,10 +2560,12 @@ fun getForkContext(contexts: Contexts, fork: ?String): Context {
   contexts.get(fork)
 }
 
-value class ContextsWithActions(
-  contexts: Contexts,
-  actions: Vector<() ~> void>,
-)
+// Heap-allocated class (not a value class) because it crosses the C FFI
+// boundary (`SKIP_check_fork_context`, `SKIP_context_sync`,
+// `SKIP_context_sync_no_lock`). Returning a multi-field value class across C
+// breaks the wasm32 ABI, where Clang lowers struct returns to an `sret`
+// out-parameter while `skc` uses multi-value `{ ptr, ptr }` returns (#1389).
+class ContextsWithActions(contexts: Contexts, actions: Vector<() ~> void>)
 
 @debug
 @export("SKIP_check_fork_context")
@@ -2573,6 +2575,21 @@ fun setForkContext(
   context: Context,
 ): ContextsWithActions {
   contexts.check(fork, context)
+}
+
+@debug
+@export("SKIP_contexts_with_actions_get_contexts")
+fun contextsWithActionsGetContexts(res: ContextsWithActions): Contexts {
+  res.contexts
+}
+
+@debug
+@export("SKIP_contexts_with_actions_with_contexts")
+fun contextsWithActionsWithContexts(
+  res: ContextsWithActions,
+  contexts: Contexts,
+): ContextsWithActions {
+  res with {contexts}
 }
 
 @debug
