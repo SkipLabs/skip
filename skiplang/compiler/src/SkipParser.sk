@@ -4328,7 +4328,8 @@ mutable class SkipParser{
 
   // matching-expression:
   //    unary-expression
-  //    matching-expression  is  pattern
+  //    matching-expression  is  atomic-pattern
+  //    matching-expression  as  atomic-pattern
   //    matching-expression  match  pattern-branch-block
   mutable fun parseMatchingExpression(): ParseTree {
     this.parseMatchingSuffix(this.parseUnaryExpression());
@@ -4844,8 +4845,8 @@ mutable class SkipParser{
   //    pattern-list  if-clause-opt  ->  expression-sequence
   //
   // pattern-list:
-  //    pattern
-  //    pattern-list  |  pattern
+  //    atomic-pattern
+  //    pattern-list  |  atomic-pattern
   mutable fun parsePatternBranch(): ParseTree {
     start = this.mark();
     patterns = this.parseSeparatedList(TokenKind.BAR(), parser ->
