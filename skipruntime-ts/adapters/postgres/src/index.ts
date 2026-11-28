@@ -9,13 +9,20 @@ import { type Entry, type ExternalService, type Json } from "@skipruntime/core";
 import pg from "pg";
 import format from "pg-format";
 
-export { SkipPostgresError } from "./util.js";
-import { validateKeyParam, type PostgresPKey } from "./util.js";
+export { pgTimestampToISO, SkipPostgresError } from "./util.js";
+import {
+  pgTimestampToISO,
+  validateKeyParam,
+  type PostgresPKey,
+} from "./util.js";
 export type { PostgresPKey } from "./util.js";
 
-// Pass timestamp strings straight through instead of attempting to convert to JS Date object, which would be clobbered in the Skip heap
-pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (x: string) => x);
-pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
+// Normalize Postgres timestamp/timestamptz values to ISO 8601 strings instead of
+// letting node-pg turn them into JS Date objects (which would be clobbered in the
+// Skip heap) or passing raw Postgres-formatted strings that fail Date parsing on
+// strict ECMAScript runtimes such as Hermes.
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, pgTimestampToISO);
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, pgTimestampToISO);
 
 /**
  * An `ExternalService` wrapping a PostgreSQL database.
@@ -98,6 +105,8 @@ export class PostgresExternalService implements ExternalService {
     password: string;
   }) {
     this.client = new pg.Client(db_config);
+    this.client.setTypeParser(pg.types.builtins.TIMESTAMP, pgTimestampToISO);
+    this.client.setTypeParser(pg.types.builtins.TIMESTAMPTZ, pgTimestampToISO);
     this.client.on("error", (e: Error) => {
       // The connection is broken and node-pg neither reconnects nor accepts
       // further queries on this client, so the LISTEN registrations are gone
