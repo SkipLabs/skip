@@ -2,7 +2,23 @@ import type { Entry, ExternalService, Json } from "@skipruntime/core";
 import { SkipUnknownResourceError } from "@skipruntime/core";
 import { fetchJSON } from "./rest.js";
 
-type Timeout = ReturnType<typeof setInterval>;
+type Timeout = ReturnType<typeof setTimeout>;
+
+/**
+ * Polling interval specification for a {@link PolledHTTPResource}.
+ *
+ * May be either a fixed delay in milliseconds, or a function computing the delay (in milliseconds) before the next poll.
+ * When given as a function, it is invoked after each poll completes with the resource `params` and the JSON payload returned by the latest poll (or `null` if the response had an empty body or the poll failed).
+ * Returning a non-positive, non-finite, or `null` value stops further polling for that subscription instance.
+ */
+export type PollingInterval =
+  | number
+  | ((params: Json, lastData: Json | null) => number | null);
+
+type SubscriptionState = {
+  timer: Timeout | null;
+  active: boolean;
+};
 
 /**
  * Encode params for external resource request.
@@ -34,9 +50,9 @@ export interface PolledHTTPResource {
    */
   url: string;
   /**
-   * The interval of time to wait before refreshing the data, given in milliseconds
+   * Delay before refreshing the data, in milliseconds, or a function returning the next delay in milliseconds (or `null` / non-positive / non-finite to stop polling).
    */
-  interval: number;
+  interval: PollingInterval;
   /**
    * Function to convert data received from external resource to `key`-`value` entries.
    */
@@ -59,7 +75,7 @@ export interface PolledHTTPResource {
  * A `PolledExternalService` may be composed of one or more [`PolledHTTPResource`](https://skiplabs.io/docs/api/helpers/interfaces/PolledHTTPResource)s, each of which describes a single endpoint and how to poll it.
  */
 export class PolledExternalService implements ExternalService {
-  private readonly intervals = new Map<string, Timeout>();
+  private readonly subscriptions = new Map<string, SubscriptionState>();
 
   /**
    * Construct a polled external service.
@@ -86,35 +102,91 @@ export class PolledExternalService implements ExternalService {
       throw new SkipUnknownResourceError(
         `Unknown resource named '${resourceName}'`,
       );
+    this.unsubscribe(instance);
+    const state: SubscriptionState = { timer: null, active: true };
+    this.subscriptions.set(instance, state);
+
     const url = `${resource.url}${(resource.encodeParams ?? defaultParamEncoder)(params)}`;
-    const call = async (init: boolean) => {
+    const call = async (init: boolean): Promise<Json | null> => {
       const [data, _] = await fetchJSON(url, "GET", resource.options ?? {});
+      if (!state.active) return null;
       await callbacks.update(resource.conv(data ?? []), init);
+      return data;
     };
-    await call(true);
-    this.intervals.set(
-      instance,
-      setInterval(() => {
-        call(false).catch((e: unknown) => {
-          callbacks.error(e);
-          console.error(e);
-        });
-      }, resource.interval),
-    );
+
+    const scheduleNext = (lastData: Json | null) => {
+      if (!state.active) return;
+      let delay: number | null;
+      try {
+        delay =
+          typeof resource.interval === "function"
+            ? resource.interval(params, lastData)
+            : resource.interval;
+      } catch (e: unknown) {
+        callbacks.error(e);
+        console.error(e);
+        if (this.subscriptions.get(instance) === state) {
+          this.subscriptions.delete(instance);
+        }
+        state.active = false;
+        return;
+      }
+      if (delay === null || !Number.isFinite(delay) || delay <= 0) {
+        if (this.subscriptions.get(instance) === state) {
+          this.subscriptions.delete(instance);
+        }
+        state.active = false;
+        return;
+      }
+      state.timer = setTimeout(() => {
+        state.timer = null;
+        if (!state.active) return;
+        call(false)
+          .then((data) => {
+            scheduleNext(data);
+          })
+          .catch((e: unknown) => {
+            if (!state.active) return;
+            callbacks.error(e);
+            console.error(e);
+            scheduleNext(null);
+          });
+      }, delay);
+    };
+
+    let initialData: Json | null;
+    try {
+      initialData = await call(true);
+    } catch (e: unknown) {
+      if (this.subscriptions.get(instance) === state) {
+        this.subscriptions.delete(instance);
+      }
+      state.active = false;
+      throw e;
+    }
+    scheduleNext(initialData);
   }
 
   unsubscribe(instance: string): void {
-    const interval = this.intervals.get(instance);
-    if (interval) {
-      clearInterval(interval);
-      this.intervals.delete(instance);
+    const state = this.subscriptions.get(instance);
+    if (state) {
+      state.active = false;
+      if (state.timer !== null) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      this.subscriptions.delete(instance);
     }
   }
 
   shutdown(): Promise<void> {
-    for (const [instance, interval] of this.intervals.entries()) {
-      clearInterval(interval);
-      this.intervals.delete(instance);
+    for (const [instance, state] of this.subscriptions.entries()) {
+      state.active = false;
+      if (state.timer !== null) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      this.subscriptions.delete(instance);
     }
     return Promise.resolve();
   }
