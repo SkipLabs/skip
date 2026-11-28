@@ -11,6 +11,64 @@ class MixedLayout(
 
 value class Pair128(x: Int128, y: UInt128) uses Orderable, Hashable
 
+mutable class MutHolder(mutable v: Int128, tag: String)
+
+// Hierarchy whose virtual methods return distinct compile-time Int128
+// constants, causing Int128 ConstantInt entries to be placed in vtables
+// (exercising computeVTableMask and contiguous multi-word vtable placement).
+base class VTableTag {
+  fun code(): Int128;
+  fun aux(): Int128;
+}
+class VTAlpha() extends VTableTag {
+  fun code(): Int128 {
+    Int128::fromInt(1)
+  }
+  fun aux(): Int128 {
+    Int128::fromInt(-101)
+  }
+}
+class VTBeta() extends VTableTag {
+  fun code(): Int128 {
+    Int128::fromInt(2)
+  }
+  fun aux(): Int128 {
+    Int128::fromInt(-202)
+  }
+}
+class VTGamma() extends VTableTag {
+  fun code(): Int128 {
+    Int128::fromInt(3)
+  }
+  fun aux(): Int128 {
+    Int128::fromInt(-303)
+  }
+}
+class VTDelta() extends VTableTag {
+  fun code(): Int128 {
+    Int128::fromInt(4)
+  }
+  fun aux(): Int128 {
+    Int128::fromInt(-404)
+  }
+}
+
+// Pure ConstantObject & ConstantArray static images (fromInt / fromUInt64
+// constant-fold to ConstantInt so AsmOutput emits 128-bit static image fields).
+class StaticPair(a: Int128, b: Int128, c: Int128) uses Equality
+
+const kStaticPair: StaticPair = StaticPair(
+  Int128::fromInt(-7),
+  Int128::fromInt(42),
+  Int128::fromUInt64(99),
+);
+const kStaticArr: Array<Int128> = Array[
+  Int128::fromInt(-7),
+  Int128::fromInt(0),
+  Int128::fromInt(42),
+  Int128::fromUInt64(99),
+];
+
 const kConstZero: Int128 = Int128::zero();
 const kConstNeg: Int128 = Int128::fromInt(-42);
 const kConstBig: Int128 = Int128::fromHalves(
@@ -24,6 +82,9 @@ const kConstBox: MixedLayout = MixedLayout(
   Int32::truncate(99),
   Int128::fromInt(-7),
   "const-ok",
+);
+const kConstLargeArr: Array<Int128> = Array::fillBy(512, i ->
+  Int128::fromHalves(i * 17 + 3, -i)
 );
 
 fun check(label: String, cond: Bool): void {
@@ -56,6 +117,12 @@ fun testConstructionAndHalves(): void {
     "fromHalves roundtrip",
     h.lo() == 0x1122334455667788 && h.hi() == 0x99AABBCCDDEEFF00,
   );
+  check("toUInt128/fromUInt128", Int128::fromUInt128(h.toUInt128()) == h);
+}
+
+@no_inline
+fun opaqueInt128(x: Int128): Int128 {
+  x
 }
 
 fun testArithmetic(): void {
@@ -109,6 +176,47 @@ fun testArithmetic(): void {
     two127.urem(Int128::fromInt(3)) == Int128::fromInt(2),
   );
 
+  // Int128::min() / -1 and % -1 (both constant-foldable and runtime/opaque)
+  check("min / -1 const", Int128::min() / Int128::fromInt(-1) == Int128::min());
+  check(
+    "min % -1 const",
+    Int128::min() % Int128::fromInt(-1) == Int128::zero(),
+  );
+  rtMin = opaqueInt128(Int128::min());
+  rtNeg1 = opaqueInt128(Int128::fromInt(-1));
+  check("min / -1 runtime", rtMin / rtNeg1 == Int128::min());
+  check("min % -1 runtime", rtMin % rtNeg1 == Int128::zero());
+
+  // Full 128-bit divisors (b.hi() != 0): b > a, clz(b) == clz(a), large quotients
+  dLarge = opaqueInt128(Int128::fromHalves(0x123456789ABCDEF0, 0x5));
+  dBigger = opaqueInt128(Int128::fromHalves(0x123456789ABCDEF1, 0x5));
+  check("udiv b > a", dLarge.udiv(dBigger) == Int128::zero());
+  check("urem b > a", dLarge.urem(dBigger) == dLarge);
+  check("sdiv b > a", dLarge / dBigger == Int128::zero());
+  check("srem b > a", dLarge % dBigger == dLarge);
+
+  // Same clz(a) == clz(b) with b <= a
+  sameClzA = opaqueInt128(Int128::fromHalves(0xFFFFFFFFFFFFFFFF, 0x7));
+  sameClzB = opaqueInt128(Int128::fromHalves(0x0000000000000001, 0x4));
+  check("udiv same clz", sameClzA.udiv(sameClzB) == Int128::one());
+  check("urem same clz", sameClzA.urem(sameClzB) == sameClzA - sameClzB);
+  check("sdiv same clz", sameClzA / sameClzB == Int128::one());
+  check("srem same clz", sameClzA % sameClzB == sameClzA - sameClzB);
+
+  // Large quotient with b.hi() != 0: (b * q + r) / b == q, % b == r
+  wideB = opaqueInt128(Int128::fromHalves(0x0000000000000003, 0x1));
+  wideQ = opaqueInt128(Int128::fromInt(0x123456));
+  wideR = opaqueInt128(Int128::fromHalves(0xCAFEBABE, 0));
+  wideA = wideB * wideQ + wideR;
+  check("udiv wide", wideA.udiv(wideB) == wideQ);
+  check("urem wide", wideA.urem(wideB) == wideR);
+  check("sdiv wide", wideA / wideB == wideQ);
+  check("srem wide", wideA % wideB == wideR);
+  check("sdiv wide neg", (-wideA) / wideB == -wideQ);
+  check("srem wide neg", (-wideA) % wideB == -wideR);
+  check("sdiv wide neg/neg", (-wideA) / (-wideB) == wideQ);
+  check("srem wide neg/neg", (-wideA) % (-wideB) == -wideR);
+
   // Division by zero throws
   threw = false;
   try {
@@ -127,6 +235,24 @@ fun testArithmetic(): void {
   | _ -> void
   };
   check("udiv by zero throws", threwU);
+
+  threwRem = false;
+  try {
+    _ = Int128::one() % Int128::zero()
+  } catch {
+  | DivisionByZeroException _ -> !threwRem = true
+  | _ -> void
+  };
+  check("rem by zero throws", threwRem);
+
+  threwURem = false;
+  try {
+    _ = Int128::one().urem(Int128::zero())
+  } catch {
+  | DivisionByZeroException _ -> !threwURem = true
+  | _ -> void
+  };
+  check("urem by zero throws", threwURem);
 }
 
 fun testBitwiseAndShifts(): void {
@@ -168,8 +294,8 @@ fun testBitwiseAndShifts(): void {
   check("shr 64 sign-ext", top.shr(64) == Int128::fromHalves(Int::min, -1));
   check("shr 127 sign-ext", top.shr(127) == Int128::fromInt(-1));
 
-  // Variable shifts (runtime shift counts across 0, 1, 63, 64, 65, 127, 128)
-  counts = Array[0, 1, 7, 63, 64, 65, 127, 128];
+  // Variable shifts (runtime shift counts including negative & non-Int Integral)
+  counts = Array[0, 1, 7, 63, 64, 65, 127, 128, -1, -64, Int::min];
   for (c in counts) {
     s = c.and(127);
     shifted = one.shl(c);
@@ -180,9 +306,21 @@ fun testBitwiseAndShifts(): void {
     };
     check("var ushr inverse", shifted.ushr(c) == one);
   };
-  for (c in Array[1, 63, 64, 65, 127]) {
+  for (c in Array[1, 63, 64, 65, 127, -1, -64]) {
     check("var shr neg stays neg", top.shr(c) < Int128::zero())
   };
+  check(
+    "shl Int32 count",
+    one.shl(Int32::truncate(64)) == Int128::fromHalves(0, 1),
+  );
+  check(
+    "ushr Int32 count",
+    top.ushr(Int32::truncate(64)) == Int128::fromHalves(Int::min, 0),
+  );
+  check(
+    "shr Int32 count",
+    top.shr(Int32::truncate(64)) == Int128::fromHalves(Int::min, -1),
+  );
 
   // clz / ctz / popcount
   check("clz 0", Int128::zero().clz() == 128);
@@ -243,6 +381,45 @@ fun testUInt128(): void {
     "u128 toStringHex",
     m.toStringHex() == "ffffffffffffffffffffffffffffffff",
   );
+  check(
+    "u128 toStringBinary",
+    UInt128::one().toStringBinary() ==
+      "0000000000000000000000000000000000000000000000000000000000000000" +
+        "0000000000000000000000000000000000000000000000000000000000000001",
+  );
+  check("u128 inspect", inspect(UInt128::fromUInt64(42)).toString() == "42");
+
+  // UInt128 bitwise, shifts, bit counts
+  uA = UInt128::fromHalves(0x00FF, 0xFF00);
+  uB = UInt128::fromHalves(0x0F0F, 0xF0F0);
+  check("u128 and", uA.and(uB) == UInt128::fromHalves(0x000F, 0xF000));
+  check("u128 or", uA.or(uB) == UInt128::fromHalves(0x0FFF, 0xFFF0));
+  check("u128 xor", uA.xor(uB) == UInt128::fromHalves(0x0FF0, 0x0FF0));
+  check("u128 not", z.not() == m);
+  check("u128 shl/ushr", o.shl(Int32::truncate(64)).ushr(64) == o);
+  check(
+    "u128 clz/ctz/popcount",
+    o.clz() == 127 && o.ctz() == 0 && m.popcount() == 128,
+  );
+
+  // UInt128 div/rem by zero throw
+  threwUDiv = false;
+  try {
+    _ = o / z
+  } catch {
+  | DivisionByZeroException _ -> !threwUDiv = true
+  | _ -> void
+  };
+  check("u128 div by zero throws", threwUDiv);
+
+  threwURem = false;
+  try {
+    _ = o % z
+  } catch {
+  | DivisionByZeroException _ -> !threwURem = true
+  | _ -> void
+  };
+  check("u128 rem by zero throws", threwURem);
 }
 
 fun testFormatting(): void {
@@ -265,6 +442,51 @@ fun testFormatting(): void {
 }
 
 fun testStorageAndRuntime(): void {
+  // Pure ConstantObject & ConstantArray static images
+  check(
+    "static pair",
+    kStaticPair ==
+      StaticPair(
+        Int128::fromInt(-7),
+        Int128::fromInt(42),
+        Int128::fromUInt64(99),
+      ),
+  );
+  check(
+    "static arr",
+    kStaticArr.size() == 4 &&
+      kStaticArr[0] == Int128::fromInt(-7) &&
+      kStaticArr[1] == Int128::zero() &&
+      kStaticArr[2] == Int128::fromInt(42) &&
+      kStaticArr[3] == Int128::fromUInt64(99),
+  );
+
+  // VTable-stored Int128 constants (virtual dispatch & TypeSwitch)
+  tags: Array<VTableTag> = Array[VTAlpha(), VTBeta(), VTGamma(), VTDelta()];
+  expectedCodes = Array[
+    Int128::fromInt(1),
+    Int128::fromInt(2),
+    Int128::fromInt(3),
+    Int128::fromInt(4),
+  ];
+  expectedAux = Array[
+    Int128::fromInt(-101),
+    Int128::fromInt(-202),
+    Int128::fromInt(-303),
+    Int128::fromInt(-404),
+  ];
+  for (i in Range(0, tags.size())) {
+    check("vtable code", tags[i].code() == expectedCodes[i]);
+    check("vtable aux", tags[i].aux() == expectedAux[i]);
+    matched = tags[i] match {
+    | VTAlpha _ -> Int128::fromInt(10)
+    | VTBeta _ -> Int128::fromInt(20)
+    | VTGamma _ -> Int128::fromInt(30)
+    | VTDelta _ -> Int128::fromInt(40)
+    };
+    check("typeswitch i128 const", matched == Int128::fromInt((i + 1) * 10));
+  };
+
   // Consts & static images
   check("const zero", kConstZero == Int128::zero());
   check("const neg", kConstNeg == Int128::fromInt(-42));
@@ -292,21 +514,36 @@ fun testStorageAndRuntime(): void {
     Int128::fromHalves(0x3333, 0x4444),
     "heap-ok",
   );
-  interned = intern(obj);
-  check("interned eq", interned == obj);
+  objCopy = MixedLayout(
+    false,
+    Int8::truncate(-5),
+    Int128::fromHalves(0x1111, 0x2222),
+    Int32::truncate(123456),
+    Int128::fromHalves(0x3333, 0x4444),
+    "heap-ok",
+  );
+  check("mixed eq", objCopy == obj);
   check(
-    "interned fields",
-    interned.a.lo() == 0x1111 &&
-      interned.a.hi() == 0x2222 &&
-      interned.b.lo() == 0x3333 &&
-      interned.b.hi() == 0x4444,
+    "mixed fields",
+    obj.a.lo() == 0x1111 &&
+      obj.a.hi() == 0x2222 &&
+      obj.b.lo() == 0x3333 &&
+      obj.b.hi() == 0x4444,
   );
 
-  // Arrays of Int128 and UInt128
+  // Arrays of Int128 and UInt128 (including large obstack & interned const
+  // arrays for wasm32 4-byte-aligned large-page/interned allocation coverage)
   arr = Array::fillBy(16, i -> Int128::fromHalves(i, i * 100));
   for (i in Range(0, 16)) {
     check("arr elem", arr[i] == Int128::fromHalves(i, i * 100))
   };
+  bigArr = Array::fillBy(512, i -> Int128::fromHalves(i * 17 + 3, -i));
+  check("const large arr eq", kConstLargeArr == bigArr);
+  check(
+    "const large arr ends",
+    kConstLargeArr[0] == Int128::fromHalves(3, 0) &&
+      kConstLargeArr[511] == Int128::fromHalves(511 * 17 + 3, -511),
+  );
   marr = Array<Int128>::mfill(4, Int128::zero());
   marr.set(2, Int128::fromHalves(0xAAAA, 0xBBBB));
   check(
@@ -314,18 +551,59 @@ fun testStorageAndRuntime(): void {
     marr[2] == Int128::fromHalves(0xAAAA, 0xBBBB) && marr[1] == Int128::zero(),
   );
 
-  // Option<Int128> & Tuples & Value classes
+  // Mutable Int128 field + freeze via immutable copy
+  holder = mutable MutHolder(Int128::fromHalves(1, 2), "mut");
+  holder.!v = Int128::fromHalves(0xDEAD, 0xBEEF);
+  check(
+    "mut field write/read",
+    holder.v == Int128::fromHalves(0xDEAD, 0xBEEF) && holder.tag == "mut",
+  );
+  frozenHolder: MutHolder = MutHolder(holder.v, holder.tag);
+  check(
+    "mut field frozen copy",
+    frozenHolder.v == Int128::fromHalves(0xDEAD, 0xBEEF) &&
+      frozenHolder.tag == "mut",
+  );
+
+  // Option<Int128>, nested ??Int128, Tuples, Value classes & Lambda capture
   optSome: ?Int128 = Some(Int128::fromHalves(1, 2));
   optNone: ?Int128 = None();
   check("optSome", optSome == Some(Int128::fromHalves(1, 2)));
   check("optNone", optNone is None());
+  nestedSome: ??Int128 = Some(Some(Int128::fromHalves(7, 8)));
+  nestedInnerNone: ??Int128 = Some(None());
+  nestedOuterNone: ??Int128 = None();
+  check(
+    "nested opt some",
+    nestedSome match {
+    | Some(Some(x)) -> x == Int128::fromHalves(7, 8)
+    | _ -> false
+    },
+  );
+  check(
+    "nested opt inner none",
+    nestedInnerNone match {
+    | Some(None()) -> true
+    | _ -> false
+    },
+  );
+  check("nested opt outer none", nestedOuterNone is None());
+
+  captured = Int128::fromHalves(0x1111222233334444, 0x5555666677778888);
+  adder: Int128 -> Int128 = x -> x + captured;
+  check(
+    "lambda capture i128",
+    adder(Int128::fromInt(1)) ==
+      Int128::fromHalves(0x1111222233334445, 0x5555666677778888),
+  );
+
   pair = Pair128(Int128::fromInt(-5), UInt128::fromUInt64(99));
   check(
     "value class pair",
     pair.x == Int128::fromInt(-5) && pair.y == UInt128::fromUInt64(99),
   );
 
-  // UnorderedMap & SortedMap keyed by Int128 / UInt128
+  // UnorderedMap & SortedMap keyed by Int128 / UInt128 (including hash avalanche)
   umap = mutable UnorderedMap<Int128, String>[];
   k1 = Int128::fromHalves(1, 0);
   k2 = Int128::fromHalves(1, 1);
@@ -337,6 +615,11 @@ fun testStorageAndRuntime(): void {
     "umap lookup",
     umap[k1] == "k1" && umap[k2] == "k2" && umap[k3] == "k3",
   );
+  check(
+    "hash avalanche",
+    Int128::fromHalves(0, 1).hash() != Int128::fromHalves(0, 2).hash() &&
+      Int128::fromInt(-1).hash() != Int128::fromUInt64(-1).hash(),
+  );
 
   smap = SortedMap<UInt128, Int>[
     UInt128::max() => 3,
@@ -344,6 +627,17 @@ fun testStorageAndRuntime(): void {
     UInt128::fromHalves(0, 1) => 2,
   ];
   check("smap order", smap.values().collect(Array) == Array[1, 2, 3]);
+
+  smapSigned = SortedMap<Int128, Int>[
+    Int128::max() => 4,
+    Int128::min() => 1,
+    Int128::fromInt(-1) => 2,
+    Int128::zero() => 3,
+  ];
+  check(
+    "smap signed order",
+    smapSigned.values().collect(Array) == Array[1, 2, 3, 4],
+  );
 
   // phys_eq on Int128 & Pair128
   check("phys_eq equal", Runtime.phys_eq(k1, Int128::fromHalves(1, 0)));
