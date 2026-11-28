@@ -199,4 +199,96 @@ fun testPipelineDirectoryBoundaries(): void {
   )
 }
 
+class RecordingFPostponable(
+  onPerform: SKStore.Context ~> void,
+) extends SKStore.FPostponable {
+  protected fun perform(context: SKStore.Context): void {
+    this.onPerform(context)
+  }
+}
+
+@test
+fun testContextSyncRunsPostponedActions(): void {
+  // Exercise both SKIP_context_sync_no_lock (synchronizer = None) and
+  // SKIP_context_sync (synchronizer = Some) returning ContextsWithActions
+  // with a non-empty actions queue and updated interned Contexts.
+  SKStore.runWithGc(SKStore.Context::create{}, _ ~> SKStore.CStop(None()));
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    context.setGlobal("SYNC_ACTION_NO_LOCK", SKStore.IntFile(7));
+    context.postpone(
+      RecordingFPostponable(
+        ctx ~> {
+          v = SKStore.IntFile::type(
+            ctx.getGlobal("SYNC_ACTION_NO_LOCK").fromSome(),
+          ).value;
+          SKTest.expectEq(v, 7);
+          _ = SKStore.runWithResult(c ~> {
+            c.setGlobal("SYNC_ACTION_NO_LOCK_RAN", SKStore.IntFile(v * 2));
+            void
+          })
+        },
+        context.getTick(),
+      ),
+    );
+    SKStore.CStop(None())
+  });
+
+  synchronizer = SKStore.Synchronizer(
+    (_, _, _) ~> void,
+    (newRoot, _, _) ~> {
+      newRoot.postpone(
+        RecordingFPostponable(
+          ctx ~> {
+            v = SKStore.IntFile::type(
+              ctx.getGlobal("SYNC_ACTION_WITH_LOCK").fromSome(),
+            ).value;
+            SKTest.expectEq(v, 11);
+            _ = SKStore.runWithResult(c ~> {
+              c.setGlobal("SYNC_ACTION_WITH_LOCK_RAN", SKStore.IntFile(v * 2));
+              void
+            })
+          },
+          newRoot.getTick(),
+        ),
+      );
+      false
+    },
+    _ ~> void,
+  );
+  res = SKStore.runWithResult(
+    context ~> {
+      context.setGlobal("SYNC_ACTION_WITH_LOCK", SKStore.IntFile(11));
+      11
+    },
+    Some(synchronizer),
+  );
+  SKTest.expectEq(res.fromSuccess(), 11);
+  SKStore.withContext(context -> {
+    SKTest.expectEq(
+      SKStore.IntFile::type(context.getGlobal("SYNC_ACTION_NO_LOCK").fromSome())
+        .value,
+      7,
+    );
+    SKTest.expectEq(
+      SKStore.IntFile::type(
+        context.getGlobal("SYNC_ACTION_NO_LOCK_RAN").fromSome(),
+      ).value,
+      14,
+    );
+    SKTest.expectEq(
+      SKStore.IntFile::type(
+        context.getGlobal("SYNC_ACTION_WITH_LOCK").fromSome(),
+      ).value,
+      11,
+    );
+    SKTest.expectEq(
+      SKStore.IntFile::type(
+        context.getGlobal("SYNC_ACTION_WITH_LOCK_RAN").fromSome(),
+      ).value,
+      22,
+    )
+  })
+}
+
 module end;

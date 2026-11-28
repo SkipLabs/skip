@@ -310,12 +310,8 @@ typedef struct {
 
 typedef char* Context;
 typedef char* Contexts;
+typedef char* ContextsWithActions;
 typedef char* Fork;
-
-typedef struct {
-  Contexts contexts;
-  void* actions;
-} sk_contexts_with_actions_t;
 
 #ifndef __cplusplus
 int(memcmp)(const void* ptr1, const void* ptr2, size_t num);
@@ -354,7 +350,10 @@ uintptr_t sk_decr_ref_count(void*);
 void sk_free_size(void*, size_t);
 void sk_free_root(Contexts);
 Context SKIP_get_fork_context(Contexts, Fork);
-sk_contexts_with_actions_t SKIP_check_fork_context(Contexts, Fork, Context);
+ContextsWithActions SKIP_check_fork_context(Contexts, Fork, Context);
+Contexts SKIP_contexts_with_actions_get_contexts(ContextsWithActions);
+ContextsWithActions SKIP_contexts_with_actions_with_contexts(
+    ContextsWithActions, Contexts);
 uint32_t SKIP_has_fork_context(Contexts, Fork);
 
 #ifdef SKIP64
